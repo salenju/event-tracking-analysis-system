@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>前端埋点SDK Demo</title>
+    <script src="./flyway-track-sdk.js"></script>
+    <script>
+        const tracker = new TrackerSDK({
+            serverUrl: 'https://your-analytics-server.com/api/track',
+            appId: 'your_app_id',
+            userId: 'user123', // 可以从cookie或localStorage获取
+            autoTrack: true,
+            debug: true
+        });
+    </script>
+</head>
+
+<body>
+    <button data-track="download_click">下载</button>
+</body>
+
+</html>

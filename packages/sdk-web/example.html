@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrackerSDK 使用示例</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .example-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .error-button {
+            background: #dc3545;
+        }
+        .error-button:hover {
+            background: #c82333;
+        }
+        .info {
+            background: #e7f3ff;
+            border-left: 4px solid #007bff;
+            padding: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>TrackerSDK 使用示例</h1>
+    
+    <div class="info">
+        <p>这个页面演示了优化后的 TrackerSDK 的各种功能。打开浏览器控制台查看详细日志。</p>
+    </div>
+
+    <div class="example-section">
+        <h2>1. 自动追踪功能</h2>
+        <p>以下按钮带有 data-track 属性，点击时会自动上报事件：</p>
+        <button data-track="button_click_login">登录按钮</button>
+        <button data-track="button_click_register">注册按钮</button>
+        <button data-track="button_click_submit">提交按钮</button>
+    </div>
+
+    <div class="example-section">
+        <h2>2. 手动事件追踪</h2>
+        <p>点击以下按钮触发手动事件追踪：</p>
+        <button onclick="trackCustomEvent()">自定义事件</button>
+        <button onclick="trackUserAction()">用户行为追踪</button>
+        <button onclick="trackBusinessEvent()">业务事件</button>
+    </div>
+
+    <div class="example-section">
+        <h2>3. 错误监控测试</h2>
+        <p>点击以下按钮测试错误监控功能：</p>
+        <button class="error-button" onclick="triggerJSError()">触发 JS 错误</button>
+        <button class="error-button" onclick="triggerPromiseError()">触发 Promise 错误</button>
+        <button class="error-button" onclick="loadBrokenImage()">触发资源加载错误</button>
+    </div>
+
+    <div class="example-section">
+        <h2>4. SDK 控制</h2>
+        <p>控制 SDK 行为：</p>
+        <button onclick="flushData()">立即发送队列数据</button>
+        <button onclick="updateUserId()">更新用户ID</button>
+        <button onclick="showConfig()">显示当前配置</button>
+    </div>
+
+    <div class="example-section">
+        <h2>5. 性能监控</h2>
+        <p>SDK 会自动收集页面性能指标，包括：</p>
+        <ul>
+            <li>TTFB (首字节时间)</li>
+            <li>FCP (首次内容绘制)</li>
+            <li>LCP (最大内容绘制)</li>
+            <li>FID (首次输入延迟)</li>
+            <li>CLS (累积布局偏移)</li>
+            <li>长任务监控</li>
+        </ul>
+    </div>
+
+    <!-- 引入 SDK -->
+    <script src="./flyway-track-sdk.js"></script>
+    
+    <script>
+        // 初始化 TrackerSDK
+        const tracker = new TrackerSDK({
+            serverUrl: 'https://your-analytics-server.com/api/track',
+            appId: 'demo-app-001',
+            userId: 'user-123',
+            debug: true, // 开启调试模式，方便查看日志
+            autoTrack: true,
+            batchSize: 5, // 较小的批次大小，便于测试
+            batchTimeout: 3000, // 3秒超时
+            enableErrorTracking: true,
+            enableResourceTracking: true,
+            sampleRate: 1, // 100% 采样
+        });
+
+        // 手动事件追踪示例
+        function trackCustomEvent() {
+            tracker.trackEvent('custom_button_click', {
+                buttonName: '自定义事件按钮',
+                section: '手动追踪示例',
+                timestamp: new Date().toISOString(),
+            });
+        }
+
+        function trackUserAction() {
+            tracker.track('user_action', {
+                action: 'view_section',
+                sectionId: 'manual-tracking',
+                duration: Math.floor(Math.random() * 5000) + 1000,
+            });
+        }
+
+        function trackBusinessEvent() {
+            tracker.track('business_event', {
+                eventType: 'feature_usage',
+                feature: 'event_tracking_demo',
+                value: 100,
+                currency: 'USD',
+            });
+        }
+
+        // 错误监控测试
+        function triggerJSError() {
+            // 故意触发一个 JavaScript 错误
+            setTimeout(() => {
+                throw new Error('这是一个测试用的 JavaScript 错误');
+            }, 100);
+        }
+
+        function triggerPromiseError() {
+            // 触发 Promise rejection
+            Promise.reject(new Error('这是一个测试用的 Promise 错误'))
+                .catch(() => {
+                    // 故意不处理，让它成为 unhandled rejection
+                });
+        }
+
+        function loadBrokenImage() {
+            // 加载一个不存在的图片，触发资源加载错误
+            const img = new Image();
+            img.src = 'https://nonexistent-domain-for-testing-12345.com/broken-image.jpg';
+            document.body.appendChild(img);
+        }
+
+        // SDK 控制功能
+        function flushData() {
+            tracker.flush();
+            alert('队列数据已发送（查看控制台）');
+        }
+
+        function updateUserId() {
+            const newUserId = `user-${Math.floor(Math.random() * 1000)}`;
+            tracker.updateConfig({ userId: newUserId });
+            alert(`用户ID已更新为: ${newUserId}`);
+        }
+
+        function showConfig() {
+            const config = tracker.getConfig();
+            console.log('当前 TrackerSDK 配置:', config);
+            alert('当前配置已输出到控制台');
+        }
+
+        // 页面加载完成后的一些演示
+        window.addEventListener('load', () => {
+            console.log('%c TrackerSDK 演示页面加载完成', 'color: green; font-weight: bold;');
+            
+            // 模拟一些用户行为
+            setTimeout(() => {
+                tracker.trackEvent('page_loaded', {
+                    loadTime: performance.now(),
+                    pageTitle: document.title,
+                });
+            }, 1000);
+        });
+
+        // 页面可见性变化演示
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                console.log('页面变为可见，将开始记录停留时间');
+            } else {
+                console.log('页面变为隐藏，停留时间已记录');
+            }
+        });
+
+        // 模拟 SPA 路由变化
+        function simulateRouteChange() {
+            const routes = ['/home', '/products', '/about', '/contact'];
+            const randomRoute = routes[Math.floor(Math.random() * routes.length)];
+            history.pushState({}, '', randomRoute);
+        }
+
+        // 每10秒模拟一次路由变化（可选）
+        // setInterval(simulateRouteChange, 10000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+# 漏斗配置化：新增业务只需在这里加一段，不改代码。
+# steps 必须是 domain/events.ts 里登记过的事件名，写错会在启动时报错。
+# windowMinutes：相邻两步的最大间隔，与 SDK 的 30 分钟 session 超时保持一致。
+
+- key: cashier_conversion
+  name: 收银台转化
+  appId: fylinking-storefront
+  env: prod
+  steps:
+    - cashier_view
+    - wallet_select
+    - wallet_connected
+    - pay_click
+    - pay_success
+  windowMinutes: 30
