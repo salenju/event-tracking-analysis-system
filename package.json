@@ -18,8 +18,8 @@
     "start": "npm run start -w @flyway/track-server",
     "typecheck": "npm run typecheck -w @flyway/track-server && npm run typecheck -w @flyway/analytics-web",
     "test": "npm run test -w @flyway/track-server && npm run test:sdk",
-    "test:sdk": "npm test -w flyway-track-sdk",
-    "sdk:build": "npm run build -w flyway-track-sdk",
+    "test:sdk": "npm test -w track-sdk",
+    "sdk:build": "npm run build -w track-sdk",
     "db:migrate": "npm run db:migrate -w @flyway/track-server"
   }
 }

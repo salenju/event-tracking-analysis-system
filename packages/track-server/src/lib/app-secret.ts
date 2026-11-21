@@ -3,6 +3,8 @@ import type { AppStore } from '../repositories/ports.js';
 
 interface CacheEntry {
   secret: string | null;
+  /** 应用记录上的默认环境；环境变量应用没有该字段 */
+  env: string | null;
   expiresAt: number;
 }
 
@@ -31,19 +33,35 @@ export class AppRegistry {
   ) {}
 
   async resolveSecret(appId: string): Promise<string | undefined> {
+    const entry = await this.lookup(appId);
+    return entry.secret ?? undefined;
+  }
+
+  /**
+   * 应用记录上的默认环境。appId 唯一，所以 SDK 不必再传 env；
+   * 环境变量里的存量应用没有该字段，返回 undefined 由调用方回落。
+   */
+  async resolveEnv(appId: string): Promise<string | undefined> {
+    const entry = await this.lookup(appId);
+    return entry.env ?? undefined;
+  }
+
+  private async lookup(appId: string): Promise<CacheEntry> {
     const now = Date.now();
     const cached = this.cache.get(appId);
-    if (cached && cached.expiresAt > now) {
-      return cached.secret ?? undefined;
-    }
+    if (cached && cached.expiresAt > now) return cached;
 
     if (this.store && now >= this.dbDownUntil) {
       try {
         const app = await this.store.find(appId);
         if (app) {
-          const secret = app.status === 'active' ? app.secret : null;
-          this.cache.set(appId, { secret, expiresAt: now + this.ttlMs });
-          return secret ?? undefined;
+          const entry: CacheEntry = {
+            secret: app.status === 'active' ? app.secret : null,
+            env: app.env ?? null,
+            expiresAt: now + this.ttlMs,
+          };
+          this.cache.set(appId, entry);
+          return entry;
         }
       } catch (error) {
         // DB 抖动时不能让环境变量里的存量应用一起挂掉，但也不能伪装成「应用不存在」：
@@ -51,16 +69,22 @@ export class AppRegistry {
         this.dbDownUntil = now + DB_COOLDOWN_MS;
         const fallback = this.envSecrets[appId];
         if (fallback) {
-          this.cache.set(appId, { secret: fallback, expiresAt: now + this.ttlMs });
-          return fallback;
+          const entry: CacheEntry = { secret: fallback, env: null, expiresAt: now + this.ttlMs };
+          this.cache.set(appId, entry);
+          return entry;
         }
         throw error;
       }
     }
 
     const envSecret = this.envSecrets[appId];
-    this.cache.set(appId, { secret: envSecret ?? null, expiresAt: now + (envSecret ? this.ttlMs : MISS_TTL_MS) });
-    return envSecret;
+    const entry: CacheEntry = {
+      secret: envSecret ?? null,
+      env: null,
+      expiresAt: now + (envSecret ? this.ttlMs : MISS_TTL_MS),
+    };
+    this.cache.set(appId, entry);
+    return entry;
   }
 
   invalidate(appId?: string): void {

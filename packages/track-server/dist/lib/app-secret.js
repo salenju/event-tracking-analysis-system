@@ -23,18 +23,33 @@ export class AppRegistry {
         this.ttlMs = ttlMs;
     }
     async resolveSecret(appId) {
+        const entry = await this.lookup(appId);
+        return entry.secret ?? undefined;
+    }
+    /**
+     * 应用记录上的默认环境。appId 唯一，所以 SDK 不必再传 env；
+     * 环境变量里的存量应用没有该字段，返回 undefined 由调用方回落。
+     */
+    async resolveEnv(appId) {
+        const entry = await this.lookup(appId);
+        return entry.env ?? undefined;
+    }
+    async lookup(appId) {
         const now = Date.now();
         const cached = this.cache.get(appId);
-        if (cached && cached.expiresAt > now) {
-            return cached.secret ?? undefined;
-        }
+        if (cached && cached.expiresAt > now)
+            return cached;
         if (this.store && now >= this.dbDownUntil) {
             try {
                 const app = await this.store.find(appId);
                 if (app) {
-                    const secret = app.status === 'active' ? app.secret : null;
-                    this.cache.set(appId, { secret, expiresAt: now + this.ttlMs });
-                    return secret ?? undefined;
+                    const entry = {
+                        secret: app.status === 'active' ? app.secret : null,
+                        env: app.env ?? null,
+                        expiresAt: now + this.ttlMs,
+                    };
+                    this.cache.set(appId, entry);
+                    return entry;
                 }
             }
             catch (error) {
@@ -43,15 +58,21 @@ export class AppRegistry {
                 this.dbDownUntil = now + DB_COOLDOWN_MS;
                 const fallback = this.envSecrets[appId];
                 if (fallback) {
-                    this.cache.set(appId, { secret: fallback, expiresAt: now + this.ttlMs });
-                    return fallback;
+                    const entry = { secret: fallback, env: null, expiresAt: now + this.ttlMs };
+                    this.cache.set(appId, entry);
+                    return entry;
                 }
                 throw error;
             }
         }
         const envSecret = this.envSecrets[appId];
-        this.cache.set(appId, { secret: envSecret ?? null, expiresAt: now + (envSecret ? this.ttlMs : MISS_TTL_MS) });
-        return envSecret;
+        const entry = {
+            secret: envSecret ?? null,
+            env: null,
+            expiresAt: now + (envSecret ? this.ttlMs : MISS_TTL_MS),
+        };
+        this.cache.set(appId, entry);
+        return entry;
     }
     invalidate(appId) {
         if (appId) {

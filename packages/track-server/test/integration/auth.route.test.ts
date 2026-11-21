@@ -165,7 +165,9 @@ describe('登录鉴权与管理员接口', () => {
     expect(created.statusCode).toBe(200);
     const body = created.json() as { app: { appId: string; secretMask: string; status: string }; secret: string };
     expect(body.app.status).toBe('active');
-    expect(body.app.appId).toMatch(/^storefront-[0-9a-f]{8}$/);
+    // appId 纯随机，不含应用名
+    expect(body.app.appId).toMatch(/^app-[0-9a-f]{12}$/);
+    expect(body.app.appId).not.toContain('storefront');
     expect(body.secret).toHaveLength(48);
     // 列表里只出现掩码
     expect(body.app.secretMask).not.toContain(body.secret);
@@ -218,6 +220,26 @@ describe('登录鉴权与管理员接口', () => {
       payload: { env: 'prod' },
     });
     expect(renamed.statusCode).toBe(409);
+  });
+
+  it('env 由应用记录决定：SDK 不传 env 也落到应用的环境', async () => {
+    const { token } = await devLogin('alice');
+    const headers = { authorization: `Bearer ${token}` };
+
+    const created = (
+      await app.inject({
+        method: 'POST',
+        url: '/api/admin/apps',
+        headers,
+        payload: { name: 'Env From Record', env: 'uat' },
+      })
+    ).json() as { app: { appId: string }; secret: string };
+
+    // trackPayload 里没有 env 字段
+    const ingest = await app.inject(signedTrack(created.app.appId, created.secret));
+    expect(ingest.json()).toMatchObject({ ok: true, accepted: 1 });
+    expect(db.events[0]?.env).toBe('uat');
+    expect(db.batches[0]?.env).toBe('uat');
   });
 
   it('轮换密钥后旧密钥立即失效，新密钥可用', async () => {

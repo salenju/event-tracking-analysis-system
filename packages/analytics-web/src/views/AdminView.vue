@@ -45,34 +45,29 @@ const trackBaseUrl = computed(() => {
   return (configured || window.location.origin).replace(/\/+$/, '');
 });
 
-/** 完整上报地址：appId / env 都放在 query 上，脚本标签接入不需要再配置 */
-const trackUrl = computed(() => {
-  const app = secretPayload.value.app;
-  if (!app) return '';
-  const path = signing.value?.trackPath || '/api/track';
-  const query = new URLSearchParams({ appId: app.appId, env: app.env });
-  return `${trackBaseUrl.value}${path}?${query.toString()}`;
-});
+/** 默认上报地址：SDK 不传 serverUrl 时用它（也就是本系统，数据进本看板） */
+const defaultTrackUrl = computed(() => `${trackBaseUrl.value}${signing.value?.trackPath || '/api/track'}`);
 
 const sdkFileUrl = computed(() => {
   const configured = signing.value?.sdkUrl?.trim();
-  return configured || `${trackBaseUrl.value}/sdk/flyway-track-sdk.min.js`;
+  return configured || `${trackBaseUrl.value}/sdk/track-sdk.min.js`;
 });
 
-/** 脚本标签接入：粘贴即用，不需要在构造函数里配置 appId / env */
+/** 脚本标签接入：只带 appId（env 由服务端按应用记录判定），serverUrl 可选 */
 const snippet = computed(() => {
-  if (!trackUrl.value) return '';
+  const app = secretPayload.value.app;
+  if (!app) return '';
   const openTag = `<${'script'}>`;
   const closeTag = `</${'script'}>`;
   return [
     openTag,
     '(function (w, d, s) {',
-    "  if (d.getElementById('flyway-track-sdk')) return;",
-    '  w.__flywayTrack = w.__flywayTrack || [];',
-    `  w.__flywayTrack.push(['init', { serverUrl: '${trackUrl.value}' }]);`,
+    "  if (d.getElementById('track-sdk')) return;",
+    '  w.__trackQueue = w.__trackQueue || [];',
+    `  w.__trackQueue.push(['init', { appId: '${app.appId}' }]);`,
     '  var first = d.getElementsByTagName(s)[0];',
     '  var el = d.createElement(s);',
-    "  el.id = 'flyway-track-sdk';",
+    "  el.id = 'track-sdk';",
     '  el.async = true;',
     `  el.src = '${sdkFileUrl.value}';`,
     '  first.parentNode.insertBefore(el, first);',
@@ -458,16 +453,20 @@ onMounted(async () => {
             <el-button link type="primary" @click="copy(secretPayload.secret, 'Secret')">复制</el-button>
           </div>
         </el-form-item>
-        <el-form-item label="上报地址">
+        <el-form-item label="环境">
           <div class="copy-row">
-            <span class="mono">{{ trackUrl }}</span>
-            <el-button link type="primary" @click="copy(trackUrl, '上报地址')">复制</el-button>
+            <el-tag size="small" effect="plain">{{ secretPayload.app?.env }}</el-tag>
+            <span class="muted" style="font-size: 12px">数据入看板时按此环境隔离，接入方无需再传 env</span>
           </div>
         </el-form-item>
         <el-form-item label="接入代码">
           <div class="snippet-block">
             <pre class="properties-block snippet">{{ snippet }}</pre>
             <el-button link type="primary" @click="copy(snippet, '接入代码')">一键复制</el-button>
+            <span class="muted" style="font-size: 12px">
+              默认上报到本系统（{{ defaultTrackUrl }}）。如需把数据留在自己的环境，在 init 里加
+              serverUrl: '你的上报地址'，本看板将收不到这批数据。
+            </span>
           </div>
         </el-form-item>
         <el-alert

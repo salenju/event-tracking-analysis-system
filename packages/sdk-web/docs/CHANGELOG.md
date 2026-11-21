@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.3.0（2026-11-21）
+
+接入形态收敛：**只配 appId 就能跑**，并移除 `flyway` 命名。
+
+### 变更
+
+- **`serverUrl` 可省**：缺省时按 SDK 自身 `<script>` 所在域推断 `/api/track`（`new URL('/api/track', script.src)`）；连 script 都没有时保留占位地址。显式传入 `serverUrl` 优先级最高，可把数据发到自己的采集端。
+- **`env` 可省**：appId 唯一，服务端按 `analytics_apps.env` 判定环境；只有当接入方想覆盖时才需要显式传 `env`。
+- **命名去 flyway**：包名 `track-sdk`、源码 `track-sdk.js`、产物 `dist/track-sdk.min.js`、脚本 id `track-sdk`、全局队列 `window.__trackQueue`、localStorage 前缀 `__track_sdk_*`。
+  - 升级影响：旧版 `__flywayTrack` 队列与 `__flyway_tracker_*` 本地状态不再读取，会话会重建一次。
+- **data-* 初始化放宽**：`<script id="track-sdk" data-app-id="xxx" src="...">` 即可，`data-server-url` 变为可选。
+
+### 兼容性
+
+- 构造函数用法不变（`new TrackerSDK({ serverUrl, appId, env, signSecret })` 仍可用）。
+- `serverUrl` 上的 `?appId=&env=` 仍会被解析，老接入方式不受影响。
+
 ## v2.2.0（2026-11-21）
 
 脚本标签接入（loader stub），让接入方「复制一段 script 贴进页面」即可上报，不必在构造函数里配 `appId` / `env`。**向后兼容**：不写 URL 参数、不用队列时行为与 2.1.1 完全一致。

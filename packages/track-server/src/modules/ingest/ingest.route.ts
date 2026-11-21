@@ -71,6 +71,9 @@ export function registerIngestRoutes(app: FastifyInstance, deps: IngestRouteDeps
       return reply.code(200).send({ ok: true, accepted: 0, rejected: 0, reason: auth.reason });
     }
 
+    // appId 唯一，env 以应用记录为准；环境变量里的存量应用没有记录，再回落到 query / TRACK_ENV
+    const appEnv = await deps.registry.resolveEnv(auth.appId);
+
     const appLimit = deps.limiterApp.hit(`app:${auth.appId}`, deps.config.rateLimitPerApp);
     if (!appLimit.allowed) {
       return reply
@@ -90,7 +93,7 @@ export function registerIngestRoutes(app: FastifyInstance, deps: IngestRouteDeps
     try {
       const result = await ingestBatch(
         { config: deps.config, db: deps.db, logger: request.log },
-        { rawBody, appId: auth.appId, envHint: queryEnv(query), client, userAgentHeader },
+        { rawBody, appId: auth.appId, envHint: appEnv ?? queryEnv(query), client, userAgentHeader },
       );
 
       if (result.status === 'duplicate') {

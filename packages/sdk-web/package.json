@@ -1,20 +1,20 @@
 {
-  "name": "flyway-track-sdk",
-  "version": "2.2.0",
+  "name": "track-sdk",
+  "version": "2.3.0",
   "description": "A powerful frontend analytics tracking SDK with performance monitoring, user behavior tracking, and error monitoring capabilities",
-  "main": "flyway-track-sdk.js",
-  "unpkg": "dist/flyway-track-sdk.min.js",
-  "jsdelivr": "dist/flyway-track-sdk.min.js",
+  "main": "track-sdk.js",
+  "unpkg": "dist/track-sdk.min.js",
+  "jsdelivr": "dist/track-sdk.min.js",
   "files": [
-    "flyway-track-sdk.js",
-    "dist/flyway-track-sdk.min.js",
+    "track-sdk.js",
+    "dist/track-sdk.min.js",
     "README.md"
   ],
   "scripts": {
     "demo": "open example.html",
-    "lint": "eslint flyway-track-sdk.js test",
+    "lint": "eslint track-sdk.js test",
     "test": "node --test test/tracker.test.js test/signature.test.js",
-    "build": "mkdir -p dist && terser flyway-track-sdk.js -c passes=2 -m --comments '/^!/' -o dist/flyway-track-sdk.min.js",
+    "build": "mkdir -p dist && terser track-sdk.js -c passes=2 -m --comments '/^!/' -o dist/track-sdk.min.js",
     "prepublishOnly": "npm run lint && npm test && npm run build"
   },
   "keywords": [
@@ -32,12 +32,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/flyway-track-sdk.git"
+    "url": "https://github.com/your-username/track-sdk.git"
   },
   "bugs": {
-    "url": "https://github.com/your-username/flyway-track-sdk/issues"
+    "url": "https://github.com/your-username/track-sdk/issues"
   },
-  "homepage": "https://github.com/your-username/flyway-track-sdk#readme",
+  "homepage": "https://github.com/your-username/track-sdk#readme",
   "engines": {
     "node": ">=18.0.0"
   },

@@ -57,7 +57,7 @@ export class AppsService {
         const now = this.now();
         const secret = randomBytes(24).toString('hex');
         for (let attempt = 0; attempt < 5; attempt += 1) {
-            const appId = buildAppId(name);
+            const appId = buildAppId();
             const app = {
                 appId,
                 name,
@@ -172,13 +172,11 @@ export class AppsService {
         return app;
     }
 }
-/** appId 形如 `storefront-1a2b3c4d`：前缀便于人工识别，后缀保证唯一 */
-function buildAppId(name) {
-    const slug = name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 24);
-    return `${slug || 'app'}-${randomBytes(4).toString('hex')}`;
+/**
+ * appId 形如 `app-9f3c1a7b2d4e`：纯随机，不含应用名。
+ * 应用名可能带业务/客户信息，写进 SDK 配置会被第三方看到，因此不参与生成。
+ */
+function buildAppId() {
+    return `app-${randomBytes(6).toString('hex')}`;
 }
 //# sourceMappingURL=apps.service.js.map

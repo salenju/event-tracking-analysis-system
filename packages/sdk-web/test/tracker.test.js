@@ -149,7 +149,7 @@ test('公共字段收敛到批次层，并带 sdkVersion', async () => {
   await tracker.flush();
 
   const payload = (await collectPayloads())[0];
-  assert.equal(payload.sdkVersion, '2.2.0');
+  assert.equal(payload.sdkVersion, '2.3.0');
   assert.equal(payload.appId, 'test-app');
   assert.equal(payload.userId, 'user-1');
   assert.ok(payload.sessionId);
@@ -205,7 +205,7 @@ test('opt-out 后不再采集，且状态持久化', async () => {
   await tracker.flush();
 
   assert.equal(harness.fetchCalls.length, 0);
-  assert.equal(harness.storage.getItem('__flyway_tracker_opt_out__'), '1');
+  assert.equal(harness.storage.getItem('__track_sdk_opt_out__'), '1');
 
   tracker.setOptOut(false);
   await tracker.track('allowed_event', {});
@@ -545,7 +545,7 @@ test('重试走指数退避，失败数据落盘并在下次启动补发', async
 
   assert.equal(delivered, false);
   assert.ok(harness.fetchCalls.length >= 3, '应包含首次请求 + 2 次重试');
-  assert.ok(harness.storage.getItem('__flyway_tracker_failed__'), '失败批次未落盘');
+  assert.ok(harness.storage.getItem('__track_sdk_failed__'), '失败批次未落盘');
   await first.destroy();
 
   harness.state.fetchMode = 'ok';
@@ -556,7 +556,7 @@ test('重试走指数退避，失败数据落盘并在下次启动补发', async
   await tick(30);
 
   assert.ok(harness.fetchCalls.length > before, '下次启动没有补发');
-  assert.equal(harness.storage.getItem('__flyway_tracker_failed__'), null);
+  assert.equal(harness.storage.getItem('__track_sdk_failed__'), null);
   await second.destroy();
 });
 
@@ -658,13 +658,28 @@ test('显式构造参数优先于 serverUrl 上的 appId/env', () => {
   assert.equal(tracker.getConfig().env, 'prod');
 });
 
+test('serverUrl 缺省时按 SDK 自身所在域推断 /api/track', async () => {
+  harness = setup();
+  harness.document.currentScript = { src: 'https://track.example.com/sdk/track-sdk.min.js' };
+  const SDK = loadSdk();
+
+  const tracker = new SDK(baseOptions({ serverUrl: '', appId: 'inferred-app' }));
+  assert.equal(tracker.getConfig().serverUrl, 'https://track.example.com/api/track');
+
+  await tracker.track('inferred_event', {});
+  await tracker.flush();
+  assert.equal(harness.fetchCalls[0].url, 'https://track.example.com/api/track');
+  await tracker.destroy();
+});
+
 test('loader stub：队列里的 init/track 在脚本加载后回放', async () => {
   harness = setup();
-  harness.window.__flywayTrack = [
+  harness.window.__trackQueue = [
     [
       'init',
       {
-        serverUrl: 'https://collect.test/api/track?appId=stub-app&env=dev',
+        appId: 'stub-app',
+        env: 'dev',
         autoTrack: false,
         enableClickTracking: false,
         enableErrorTracking: false,
@@ -678,13 +693,13 @@ test('loader stub：队列里的 init/track 在脚本加载后回放', async () 
 
   loadSdk();
 
-  const instance = harness.window.__flywayTrack.instance;
+  const instance = harness.window.__trackQueue.instance;
   assert.ok(instance, '脚本加载后应自动初始化实例');
   assert.equal(instance.getConfig().appId, 'stub-app');
   assert.equal(instance.getConfig().env, 'dev');
 
   // 加载后的 push 仍然生效（队列被替换成转发器）
-  harness.window.__flywayTrack.push(['track', 'after_event', { from: 'forwarder' }]);
+  harness.window.__trackQueue.push(['track', 'after_event', { from: 'forwarder' }]);
   await tick(50);
 
   const records = allRecords(await collectPayloads());
@@ -701,7 +716,7 @@ test('UMD：支持 CommonJS 导出与浏览器全局挂载', () => {
   const SDK = loadSdk();
 
   assert.equal(typeof SDK, 'function');
-  assert.equal(SDK.version, '2.2.0');
+  assert.equal(SDK.version, '2.3.0');
 
   const source = fs.readFileSync(SDK_PATH, 'utf8');
   const sandbox = {};

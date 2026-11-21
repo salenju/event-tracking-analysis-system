@@ -1,5 +1,5 @@
 /*!
- * flyway-track-sdk v2.2.0 | MIT License
+ * track-sdk v2.3.0 | MIT License
  * 前端埋点 SDK：性能监控（Web Vitals）、用户行为追踪、错误监控、批量上报
  *
  * 支持 CommonJS / AMD / 浏览器全局（window.TrackerSDK）三种引入方式。
@@ -17,12 +17,12 @@
 })(typeof globalThis !== 'undefined' ? globalThis : typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var SDK_VERSION = '2.2.0';
+  var SDK_VERSION = '2.3.0';
 
-  var SESSION_KEY = '__flyway_tracker_session__';
-  var OPT_OUT_KEY = '__flyway_tracker_opt_out__';
-  var FAILED_KEY = '__flyway_tracker_failed__';
-  var PROBE_KEY = '__flyway_tracker_probe__';
+  var SESSION_KEY = '__track_sdk_session__';
+  var OPT_OUT_KEY = '__track_sdk_opt_out__';
+  var FAILED_KEY = '__track_sdk_failed__';
+  var PROBE_KEY = '__track_sdk_probe__';
 
   var SESSION_TIMEOUT = 30 * 60 * 1000; // 30 分钟无操作则更换会话
   var SESSION_TOUCH_INTERVAL = 5000; // 会话活跃时间最多 5 秒落盘一次
@@ -36,13 +36,16 @@
   var MAX_BACKOFF = 30000;
 
   // 脚本标签接入：全局指令队列 + script 标签 id
-  var GLOBAL_QUEUE_KEY = '__flywayTrack';
-  var SCRIPT_ID = 'flyway-track-sdk';
+  var GLOBAL_QUEUE_KEY = '__trackQueue';
+  var SCRIPT_ID = 'track-sdk';
+  // serverUrl 缺省时，按「SDK 自己所在域的 /api/track」推断上报地址
+  var DEFAULT_ENDPOINT_PATH = '/api/track';
 
   // 需要脱敏的 query 参数名
   var SENSITIVE_KEY = /^(token|access_token|refresh_token|id_token|auth|authorization|password|passwd|pwd|secret|api_key|apikey|sign|signature|session|sessionid|phone|mobile|tel|email|idcard|id_card|card|code|ticket|key)$/i;
 
   var DEFAULT_CONFIG = {
+    // 兜底占位值：浏览器里优先按 <script id="track-sdk" src> 的域推断 /api/track
     serverUrl: 'https://your-analytics-server.com/api/track',
     appId: '',
     userId: '',
@@ -307,9 +310,35 @@
     }
   }
 
+  var resolvedServerUrl = null;
+
+  /**
+   * serverUrl 缺省时的默认上报地址：取 SDK 自身 <script> 所在域的 /api/track。
+   * 这样接入方不用传 serverUrl 也能把数据发回本系统；想留在自己环境就显式传 serverUrl。
+   */
+  function resolveDefaultServerUrl() {
+    if (resolvedServerUrl !== null) return resolvedServerUrl;
+    resolvedServerUrl = DEFAULT_CONFIG.serverUrl;
+
+    var doc = typeof document !== 'undefined' ? document : typeof window !== 'undefined' ? window.document : null;
+    if (!doc) return resolvedServerUrl;
+
+    var script = doc.currentScript;
+    if (!script && typeof doc.getElementById === 'function') script = doc.getElementById(SCRIPT_ID);
+    var src = script && script.src;
+    if (!src) return resolvedServerUrl;
+
+    try {
+      resolvedServerUrl = new URL(DEFAULT_ENDPOINT_PATH, src).href;
+    } catch (error) {
+      /* 保留占位地址 */
+    }
+    return resolvedServerUrl;
+  }
+
   function buildConfig(options) {
     var opts = options || {};
-    var serverUrl = readString(opts, 'serverUrl', DEFAULT_CONFIG.serverUrl);
+    var serverUrl = readString(opts, 'serverUrl', '') || resolveDefaultServerUrl();
     var endpoint = parseEndpointOptions(serverUrl);
     return {
       serverUrl: serverUrl,
@@ -1547,12 +1576,13 @@
    *
    * 页面里只需要：
    *   <script>
-   *     window.__flywayTrack = window.__flywayTrack || [];
-   *     window.__flywayTrack.push(['init', { serverUrl: '...?appId=&env=' }]);
-   *     // 插入 <script id="flyway-track-sdk" src="..."> 异步加载
+   *     window.__trackQueue = window.__trackQueue || [];
+   *     window.__trackQueue.push(['init', { appId: 'xxx' }]);   // serverUrl 可省
+   *     // 插入 <script id="track-sdk" src="..."> 异步加载
    *   </script>
    * SDK 加载后回放队列并自动初始化；也支持直接用
-   * <script id="flyway-track-sdk" data-server-url="...?appId=&env=" src="..."> 免队列初始化。
+   * <script id="track-sdk" data-app-id="xxx" src="..."> 免队列初始化，
+   * 或用 data-server-url 指定自己的上报地址。
    * ------------------------------------------------------------------ */
 
   function readCommand(raw) {
@@ -1563,11 +1593,13 @@
   function readScriptOptions(script) {
     if (!script || typeof script.getAttribute !== 'function') return null;
     var serverUrl = script.getAttribute('data-server-url');
-    if (!serverUrl) return null;
-    var options = { serverUrl: serverUrl };
     var appId = script.getAttribute('data-app-id');
-    var env = script.getAttribute('data-env');
+    if (!serverUrl && !appId) return null;
+
+    var options = {};
+    if (serverUrl) options.serverUrl = serverUrl;
     if (appId) options.appId = appId;
+    var env = script.getAttribute('data-env');
     if (env) options.env = env;
     return options;
   }
@@ -1612,7 +1644,9 @@
       }
       initOptions = readScriptOptions(script);
     }
-    if (!initOptions || !initOptions.serverUrl) return null;
+    if (!initOptions) return null;
+    // serverUrl 可省（按 SDK 自身域推断），但至少要能确定 appId 或上报地址
+    if (!initOptions.appId && !initOptions.serverUrl) return null;
 
     var instance = new Constructor(initOptions);
     for (var j = 0; j < pending.length; j += 1) dispatchCommand(instance, pending[j]);

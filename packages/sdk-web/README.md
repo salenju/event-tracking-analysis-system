@@ -2,7 +2,7 @@
 
 一个功能完整、可自测的前端数据埋点 SDK，支持自动性能监控、用户行为追踪、错误监控与可靠上报。
 
-当前版本：**v2.2.0**（新增脚本标签接入：appId/env 可只写在 serverUrl、支持全局队列自动初始化，见 docs/CHANGELOG.md）
+当前版本：**v2.3.0**（serverUrl 可省、env 由服务端按 appId 判定、移除 flyway 命名，见 docs/CHANGELOG.md）
 
 ## 🚀 主要特性
 
@@ -46,56 +46,57 @@
 ### 浏览器直接引入
 ```html
 <!-- 开发调试 -->
-<script src="./flyway-track-sdk.js"></script>
+<script src="./track-sdk.js"></script>
 <!-- 生产（推荐压缩版） -->
-<script src="./dist/flyway-track-sdk.min.js"></script>
+<script src="./dist/track-sdk.min.js"></script>
 ```
 
 三种形态均可用：
 ```javascript
 // 1. 经典脚本：全局变量
-const tracker = new TrackerSDK({ serverUrl, appId });
+const tracker = new TrackerSDK({ appId });
 
 // 2. CommonJS
-const TrackerSDK = require('flyway-track-sdk');
+const TrackerSDK = require('track-sdk');
 
 // 3. 打包器（ESM 互操作）
-import TrackerSDK from 'flyway-track-sdk';
+import TrackerSDK from 'track-sdk';
 ```
 
 ### 基础初始化
 ```javascript
 const tracker = new TrackerSDK({
-    serverUrl: 'https://your-analytics-server.com/api/track',
-    appId: 'your-app-id',
+    appId: 'your-app-id',   // 必需；env 由服务端按 appId 判定
+    serverUrl: 'https://your-analytics-server.com/api/track', // 可选；缺省按 SDK 自身域的 /api/track
     userId: 'user-123',
     debug: false,
 });
 ```
 
-### 脚本标签接入（免配置 appId / env）
+### 脚本标签接入（免配置 serverUrl / env）
 
-`appId` 与 `env` 可以直接写在 `serverUrl` 的 query 上，构造函数只留 `serverUrl`：
+接入地址里不需要 env（appId 唯一，服务端按应用记录判定环境）；`serverUrl` 也可以不传，SDK 会按**自己所在域的 `/api/track`** 推断：
 
 ```html
 <script>
 (function (w, d, s) {
-  if (d.getElementById('flyway-track-sdk')) return;
-  w.__flywayTrack = w.__flywayTrack || [];
-  w.__flywayTrack.push(['init', { serverUrl: 'https://track.example.com/api/track?appId=xxx&env=test' }]);
+  if (d.getElementById('track-sdk')) return;
+  w.__trackQueue = w.__trackQueue || [];
+  w.__trackQueue.push(['init', { appId: 'your-app-id' }]);
   var first = d.getElementsByTagName(s)[0];
   var el = d.createElement(s);
-  el.id = 'flyway-track-sdk';
+  el.id = 'track-sdk';
   el.async = true;
-  el.src = 'https://track.example.com/sdk/flyway-track-sdk.min.js';
+  el.src = 'https://track.example.com/sdk/track-sdk.min.js';
   first.parentNode.insertBefore(el, first);
 })(window, document, 'script');
 </script>
 ```
 
-- SDK 加载后会回放 `window.__flywayTrack` 里的指令并自动初始化；之后的 `push(['track', 'event', {...}])` 也会转发到实例。
-- 也可以省掉队列，直接 `<script id="flyway-track-sdk" data-server-url="...?appId=&env=" data-env="test" src="...">`。
-- 构造参数里的 `appId` / `env` 优先级高于 URL；`userId`、采样率等仍需显式配置。
+- SDK 加载后会回放 `window.__trackQueue` 里的指令并自动初始化；之后的 `push(['track', 'event', {...}])` 也会转发到实例。
+- 想把数据留在自己的环境：`push(['init', { appId, serverUrl: 'https://your-collector/api/track' }])`，此时本系统看板收不到这批数据。
+- 也可以省掉队列，直接 `<script id="track-sdk" data-app-id="your-app-id" src="...">`；需要自定义上报地址时再加 `data-server-url`。
+- `appId` / `env` / `serverUrl` 三者都可以显式传入，显式值优先级最高；`userId`、采样率等仍需配置。
 - 注意：这种形态不携带签名，服务端需 `SIGN_REQUIRED=false`（只做 appId 白名单 + 限流）。
 
 ### 完整配置
@@ -189,7 +190,7 @@ tracker.setOptOut(false);  // 恢复
 ```javascript
 {
     appId: 'your-app-id',
-    sdkVersion: '2.2.0',
+    sdkVersion: '2.3.0',
     userId: 'user-123',
     sessionId: 'sess_1750000000000_ab12cd34e',
     batchId: 'batch_1750000000500_xy98zw76q',
@@ -241,7 +242,7 @@ tracker.setOptOut(false);  // 恢复
 1. **Content-Type**：默认 `text/plain;charset=UTF-8`。这是简单请求，跨域时**不触发 CORS 预检**，避免 `sendBeacon` 在页面卸载期间因预检失败而静默丢数据。服务端请按**原始请求体**解析 JSON，不要依赖 `Content-Type` 判断。
 2. **CORS**：服务端需返回 `Access-Control-Allow-Origin`，并允许 `POST`。
 3. **幂等**：同一批次可能有重复投递（重试 / 卸载时补发），请用 `batchId` 去重。
-4. **补发**：客户端失败数据存放在 `localStorage` 的 `__flyway_tracker_failed__`，最多 5 个批次。
+4. **补发**：客户端失败数据存放在 `localStorage` 的 `__track_sdk_failed__`，最多 5 个批次。
 
 ## 🧪 构建与测试
 
@@ -249,8 +250,8 @@ tracker.setOptOut(false);  // 恢复
 npm install
 npm test                 # 32 个单测（零依赖，node:test）
 npm run lint             # ESLint
-npm run build            # terser 压缩到 dist/flyway-track-sdk.min.js
-SDK_ENTRY=dist/flyway-track-sdk.min.js npm test   # 对压缩产物跑同一套用例
+npm run build            # terser 压缩到 dist/track-sdk.min.js
+SDK_ENTRY=dist/track-sdk.min.js npm test   # 对压缩产物跑同一套用例
 ```
 
 单测覆盖：采样 / 配置校验 / immediate / debug 上报 / 点击子元素命中 / 去重 / 快照 / 脱敏 /
@@ -262,7 +263,7 @@ opt-out / destroy 清理 / 停留时长不重复 / 指标阶段与 CLS 算法 / 
 const tracker = new TrackerSDK({ debug: true /* ... */ });
 ```
 
-控制台输出：`[TrackerSDK] TrackerSDK 2.2.0 initialized successfully`、`Reporting <type>:`、`Batch sent via sendBeacon:`。
+控制台输出：`[TrackerSDK] TrackerSDK 2.3.0 initialized successfully`、`Reporting <type>:`、`Batch sent via sendBeacon:`。
 
 `debug` 仅控制日志输出，**不会**改变上报行为。
 

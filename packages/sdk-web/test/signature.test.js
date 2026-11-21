@@ -16,7 +16,7 @@ const crypto = require('node:crypto');
 
 const { setup, loadSdk } = require('./dom-mock');
 
-const FAILED_KEY = '__flyway_tracker_failed__';
+const FAILED_KEY = '__track_sdk_failed__';
 
 let harness;
 
@@ -204,7 +204,7 @@ test('payload 携带 env，便于服务端隔离测试数据', async () => {
 
   const payload = JSON.parse(harness.fetchCalls[0].body);
   assert.equal(payload.env, 'test');
-  assert.equal(payload.sdkVersion, '2.2.0');
+  assert.equal(payload.sdkVersion, '2.3.0');
 
   await tracker.destroy();
 });

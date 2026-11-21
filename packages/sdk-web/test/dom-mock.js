@@ -6,7 +6,7 @@
 
 const path = require('path');
 
-const SDK_PATH = path.resolve(__dirname, '..', 'flyway-track-sdk.js');
+const SDK_PATH = path.resolve(__dirname, '..', 'track-sdk.js');
 
 class MockPerformanceObserver {
   constructor(callback) {
@@ -242,7 +242,7 @@ function setup() {
   };
 }
 
-// 默认加载源码；设置 SDK_ENTRY=dist/flyway-track-sdk.min.js 可对压缩产物跑同一套用例
+// 默认加载源码；设置 SDK_ENTRY=dist/track-sdk.min.js 可对压缩产物跑同一套用例
 function loadSdk() {
   const entry = process.env.SDK_ENTRY
     ? path.resolve(__dirname, '..', process.env.SDK_ENTRY)
