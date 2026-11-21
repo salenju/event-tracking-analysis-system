@@ -45,7 +45,8 @@ export async function ingestBatch(deps, request) {
         throw new RejectBatchError('invalid_payload', detail);
     }
     const payload = envelope.data;
-    if (payload.appId !== request.appId) {
+    // 脚本标签接入时报文里没有 appId，只认验签结果；有值时仍必须一致，防止串号
+    if (payload.appId && payload.appId !== request.appId) {
         throw new RejectBatchError('app_id_mismatch', `header=${request.appId} body=${payload.appId}`);
     }
     if (payload.batch.length > config.maxRecordsPerBatch) {
@@ -59,7 +60,8 @@ export async function ingestBatch(deps, request) {
     }
     const batchId = payload.batchId;
     const appId = request.appId;
-    const env = truncate(payload.env, COLUMN_LIMITS.env) ?? config.trackEnv;
+    // 优先级：报文 env（SDK 构建期注入）> query env（脚本标签接入）> 服务端默认
+    const env = truncate(payload.env, COLUMN_LIMITS.env) ?? truncate(request.envHint, COLUMN_LIMITS.env) ?? config.trackEnv;
     // ---- 批次级上下文：此前整包丢弃，导致 UA / 页面 / 语言都无法分析 ----
     const context = payload.context;
     const rawUa = readContextString(context, 'userAgent') ?? request.userAgentHeader ?? null;

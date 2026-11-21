@@ -15,6 +15,7 @@ import {
 } from '@/api/admin';
 import type { AuthUser, UserRole } from '@/api/auth';
 import { ApiError } from '@/api/client';
+import { ENV_OPTIONS } from '@/utils/filters';
 import { formatDateTime } from '@/utils/format';
 import { ensureSession, session } from '@/utils/session';
 
@@ -37,6 +38,48 @@ const secretPayload = ref<{ app: AdminApp | null; secret: string }>({ app: null,
 
 const isAdmin = computed(() => session.user?.role === 'admin');
 const currentUserId = computed(() => session.user?.id ?? null);
+
+/** 对外可达的埋点服务地址：服务端配置优先，否则用当前站点 origin */
+const trackBaseUrl = computed(() => {
+  const configured = signing.value?.publicBaseUrl?.trim();
+  return (configured || window.location.origin).replace(/\/+$/, '');
+});
+
+/** 完整上报地址：appId / env 都放在 query 上，脚本标签接入不需要再配置 */
+const trackUrl = computed(() => {
+  const app = secretPayload.value.app;
+  if (!app) return '';
+  const path = signing.value?.trackPath || '/api/track';
+  const query = new URLSearchParams({ appId: app.appId, env: app.env });
+  return `${trackBaseUrl.value}${path}?${query.toString()}`;
+});
+
+const sdkFileUrl = computed(() => {
+  const configured = signing.value?.sdkUrl?.trim();
+  return configured || `${trackBaseUrl.value}/sdk/flyway-track-sdk.min.js`;
+});
+
+/** 脚本标签接入：粘贴即用，不需要在构造函数里配置 appId / env */
+const snippet = computed(() => {
+  if (!trackUrl.value) return '';
+  const openTag = `<${'script'}>`;
+  const closeTag = `</${'script'}>`;
+  return [
+    openTag,
+    '(function (w, d, s) {',
+    "  if (d.getElementById('flyway-track-sdk')) return;",
+    '  w.__flywayTrack = w.__flywayTrack || [];',
+    `  w.__flywayTrack.push(['init', { serverUrl: '${trackUrl.value}' }]);`,
+    '  var first = d.getElementsByTagName(s)[0];',
+    '  var el = d.createElement(s);',
+    "  el.id = 'flyway-track-sdk';",
+    '  el.async = true;',
+    `  el.src = '${sdkFileUrl.value}';`,
+    '  first.parentNode.insertBefore(el, first);',
+    "})(window, document, 'script');",
+    closeTag,
+  ].join('\n');
+});
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : '请求失败';
@@ -89,15 +132,28 @@ function openCreate(): void {
   createVisible.value = true;
 }
 
+/** 同一环境下应用名不可重复（不同环境仍可同名，便于一个业务分环境接入） */
+function hasDuplicateName(name: string, env: string, excludeAppId?: string): boolean {
+  const key = name.trim().toLowerCase();
+  return apps.value.some(
+    (app) => app.appId !== excludeAppId && app.env === env && app.name.trim().toLowerCase() === key,
+  );
+}
+
 async function submitCreate(): Promise<void> {
-  if (!createForm.name.trim()) {
+  const name = createForm.name.trim();
+  if (!name) {
     ElMessage.warning('请填写应用名称');
+    return;
+  }
+  if (hasDuplicateName(name, createForm.env)) {
+    ElMessage.warning(`环境 ${createForm.env} 下已存在同名应用「${name}」，请换一个名称或环境`);
     return;
   }
   creating.value = true;
   try {
     const result = await createApp({
-      name: createForm.name.trim(),
+      name,
       env: createForm.env.trim() || undefined,
       remark: createForm.remark.trim() || undefined,
     });
@@ -134,6 +190,18 @@ async function rotateSecret(app: AdminApp): Promise<void> {
 
 async function toggleStatus(app: AdminApp): Promise<void> {
   const next: AppStatus = app.status === 'active' ? 'disabled' : 'active';
+  const action = next === 'disabled' ? '停用' : '启用';
+  try {
+    await ElMessageBox.confirm(
+      next === 'disabled'
+        ? `停用后「${app.name}」的上报会被直接丢弃（按 unknown_app_id 处理），且不会重试。确定停用？`
+        : `启用后「${app.name}」将立即恢复上报。确定启用？`,
+      `${action}应用`,
+      { type: 'warning', confirmButtonText: `确定${action}`, cancelButtonText: '取消' },
+    );
+  } catch {
+    return;
+  }
   try {
     await updateApp(app.appId, { status: next });
     ElMessage.success(next === 'active' ? '已启用' : '已停用，该应用的埋点将被拒绝');
@@ -350,8 +418,10 @@ onMounted(async () => {
         <el-form-item label="应用名称" required>
           <el-input v-model="createForm.name" maxlength="64" show-word-limit placeholder="如 Flylinking 买家端" />
         </el-form-item>
-        <el-form-item label="默认环境">
-          <el-input v-model="createForm.env" maxlength="16" placeholder="prod / test" />
+        <el-form-item label="环境">
+          <el-select v-model="createForm.env" style="width: 100%" placeholder="请选择环境">
+            <el-option v-for="item in ENV_OPTIONS" :key="item" :label="item" :value="item" />
+          </el-select>
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="createForm.remark" type="textarea" :rows="2" maxlength="255" show-word-limit />
@@ -388,7 +458,28 @@ onMounted(async () => {
             <el-button link type="primary" @click="copy(secretPayload.secret, 'Secret')">复制</el-button>
           </div>
         </el-form-item>
-        <el-form-item label="接入配置">
+        <el-form-item label="上报地址">
+          <div class="copy-row">
+            <span class="mono">{{ trackUrl }}</span>
+            <el-button link type="primary" @click="copy(trackUrl, '上报地址')">复制</el-button>
+          </div>
+        </el-form-item>
+        <el-form-item label="接入代码">
+          <div class="snippet-block">
+            <pre class="properties-block snippet">{{ snippet }}</pre>
+            <el-button link type="primary" @click="copy(snippet, '接入代码')">一键复制</el-button>
+          </div>
+        </el-form-item>
+        <el-alert
+          v-if="signing?.signRequired"
+          type="warning"
+          show-icon
+          :closable="false"
+          style="margin: 0 0 14px"
+          title="服务端已开启签名校验"
+          description="脚本标签接入不带签名密钥，上报会被丢弃。请关闭 SIGN_REQUIRED，或改用带 signSecret 的初始化方式。"
+        />
+        <el-form-item label="凭据备份">
           <pre class="properties-block" style="width: 100%; margin: 0">{{
             JSON.stringify(
               { appId: secretPayload.app?.appId, secret: secretPayload.secret, env: secretPayload.app?.env },
@@ -442,6 +533,23 @@ onMounted(async () => {
 
 .secret {
   color: #c0341d;
+}
+
+.snippet-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+}
+
+.snippet {
+  width: 100%;
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .tips {

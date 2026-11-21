@@ -44,6 +44,11 @@ const envSchema = z.object({
   DEFAULT_TIMEZONE_OFFSET: z.string().regex(tzOffset, 'must look like +08:00').default('+08:00'),
   FUNNELS_PATH: z.string().optional(),
 
+  /** 对外可访问的埋点服务地址（含协议），用于后台生成接入地址；留空则由前端用当前站点 origin */
+  PUBLIC_TRACK_BASE_URL: z.string().default(''),
+  /** SDK 静态文件地址（脚本标签接入）；留空则由前端按 <base>/sdk/flyway-track-sdk.min.js 拼接 */
+  SDK_PUBLIC_URL: z.string().default(''),
+
   // 看板登录：飞书开放平台「网页应用」的凭证
   FEISHU_APP_ID: z.string().default(''),
   FEISHU_APP_SECRET: z.string().default(''),
@@ -105,6 +110,10 @@ export interface AppConfig {
   maxRecordBytes: number;
   trackEnv: string;
   defaultTzOffset: string;
+  /** 对外埋点服务地址，空字符串表示由前端用当前站点 origin */
+  trackPublicBaseUrl: string;
+  /** SDK 静态文件地址，空字符串表示由前端按默认路径拼接 */
+  sdkPublicUrl: string;
   funnelsPath?: string;
   logLevel: string;
   clientIpHeaders: string[];
@@ -208,6 +217,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     maxRecordBytes: data.MAX_RECORD_BYTES,
     trackEnv: data.TRACK_ENV,
     defaultTzOffset: data.DEFAULT_TIMEZONE_OFFSET,
+    trackPublicBaseUrl: data.PUBLIC_TRACK_BASE_URL.replace(/\/+$/, ''),
+    sdkPublicUrl: data.SDK_PUBLIC_URL.trim(),
     logLevel: data.LOG_LEVEL,
     clientIpHeaders: splitList(data.CLIENT_IP_HEADERS),
     geoCountryHeaders: splitList(data.GEO_COUNTRY_HEADERS),

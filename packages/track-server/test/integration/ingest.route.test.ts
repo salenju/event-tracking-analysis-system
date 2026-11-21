@@ -264,4 +264,43 @@ describe('POST /api/track', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ ok: true });
   });
+
+  it('脚本标签接入：appId/env 只在 query、报文缺省也能入库', async () => {
+    const openConfig = loadConfig({
+      NODE_ENV: 'test',
+      APP_SECRETS: JSON.stringify({ [APP_ID]: SECRET }),
+      TRACK_ENV: 'prod',
+      SIGN_REQUIRED: 'false',
+      LOG_LEVEL: 'silent',
+    } as unknown as NodeJS.ProcessEnv);
+    const openApp = await buildApp({ config: openConfig, db, funnels, logger: false });
+    try {
+      const parsed = JSON.parse(makePayload()) as Record<string, unknown>;
+      delete parsed.appId;
+      delete parsed.env;
+
+      const response = await openApp.inject({
+        method: 'POST',
+        url: `/api/track?appId=${APP_ID}&env=uat`,
+        payload: JSON.stringify(parsed),
+        headers: { 'content-type': 'text/plain;charset=UTF-8' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ ok: true, accepted: 2, rejected: 0 });
+      expect(db.batches[0]?.appId).toBe(APP_ID);
+      expect(db.batches[0]?.env).toBe('uat');
+      expect(db.events[0]?.env).toBe('uat');
+    } finally {
+      await openApp.close();
+    }
+  });
+
+  it('报文 appId 与验签结果不一致：返回 200 + app_id_mismatch', async () => {
+    const response = await app.inject(signedRequest(makePayload({ appId: 'other-app' })));
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ reason: 'app_id_mismatch' });
+    expect(db.events).toHaveLength(0);
+  });
 });

@@ -25,6 +25,15 @@ function headerAppId(headers: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
+/** 脚本标签接入：env 随 serverUrl 的 query 传递；非法值静默忽略，回落 TRACK_ENV */
+const ENV_PATTERN = /^[a-z0-9_-]{1,16}$/;
+
+function queryEnv(query: Record<string, unknown>): string | null {
+  const value = query.env;
+  const raw = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return ENV_PATTERN.test(raw) ? raw : null;
+}
+
 export function registerIngestRoutes(app: FastifyInstance, deps: IngestRouteDeps): void {
   app.post('/api/track', async (request, reply) => {
     const rawBody = typeof request.body === 'string' ? request.body : '';
@@ -43,12 +52,13 @@ export function registerIngestRoutes(app: FastifyInstance, deps: IngestRouteDeps
       return reply.code(200).send({ ok: true, accepted: 0, rejected: 0, reason: 'empty_body' });
     }
 
+    const query = (request.query ?? {}) as Record<string, unknown>;
     const auth = await authenticate(
       deps.config,
       (appId) => deps.registry.resolveSecret(appId),
       headers,
       rawBody,
-      (request.query ?? {}) as Record<string, unknown>,
+      query,
     );
     if (!auth.ok) {
       logRejected(request.log, {
@@ -80,7 +90,7 @@ export function registerIngestRoutes(app: FastifyInstance, deps: IngestRouteDeps
     try {
       const result = await ingestBatch(
         { config: deps.config, db: deps.db, logger: request.log },
-        { rawBody, appId: auth.appId, client, userAgentHeader },
+        { rawBody, appId: auth.appId, envHint: queryEnv(query), client, userAgentHeader },
       );
 
       if (result.status === 'duplicate') {

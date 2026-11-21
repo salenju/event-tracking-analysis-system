@@ -22,6 +22,10 @@ export interface SigningInfo {
   signWindowSeconds: number;
   trackPath: string;
   env: string;
+  /** 服务端配置的对外埋点地址，空字符串表示用当前站点 origin 拼 */
+  publicBaseUrl: string;
+  /** 服务端配置的 SDK 静态文件地址，空字符串表示按默认路径拼 */
+  sdkUrl: string;
 }
 
 export interface AppListResult {

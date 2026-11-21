@@ -1,5 +1,5 @@
 /*!
- * flyway-track-sdk v2.1.1 | MIT License
+ * flyway-track-sdk v2.2.0 | MIT License
  * 前端埋点 SDK：性能监控（Web Vitals）、用户行为追踪、错误监控、批量上报
  *
  * 支持 CommonJS / AMD / 浏览器全局（window.TrackerSDK）三种引入方式。
@@ -17,7 +17,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var SDK_VERSION = '2.1.1';
+  var SDK_VERSION = '2.2.0';
 
   var SESSION_KEY = '__flyway_tracker_session__';
   var OPT_OUT_KEY = '__flyway_tracker_opt_out__';
@@ -34,6 +34,10 @@
   var MAX_LONG_TASK_ITEMS = 20; // 长任务明细最多上报 20 条
   var MAX_PATH_CLASSES = 3; // 元素路径中最多保留 3 个 class
   var MAX_BACKOFF = 30000;
+
+  // 脚本标签接入：全局指令队列 + script 标签 id
+  var GLOBAL_QUEUE_KEY = '__flywayTrack';
+  var SCRIPT_ID = 'flyway-track-sdk';
 
   // 需要脱敏的 query 参数名
   var SENSITIVE_KEY = /^(token|access_token|refresh_token|id_token|auth|authorization|password|passwd|pwd|secret|api_key|apikey|sign|signature|session|sessionid|phone|mobile|tel|email|idcard|id_card|card|code|ticket|key)$/i;
@@ -93,6 +97,40 @@
     if (value === undefined || value === null) return fallback;
     if (typeof value !== 'string') throw new Error('TrackerSDK: ' + key + ' must be a string');
     return value;
+  }
+
+  /**
+   * 脚本标签接入：appId / env 可以只写在 serverUrl 的 query 上
+   * （https://host/api/track?appId=xxx&env=test），构造函数里的同名配置优先。
+   */
+  function parseEndpointOptions(serverUrl) {
+    var result = { appId: '', env: '' };
+    if (typeof serverUrl !== 'string') return result;
+    var queryStart = serverUrl.indexOf('?');
+    if (queryStart === -1) return result;
+
+    var query = serverUrl.slice(queryStart + 1).split('#')[0];
+    if (!query) return result;
+
+    var pairs = query.split('&');
+    for (var i = 0; i < pairs.length; i += 1) {
+      var index = pairs[i].indexOf('=');
+      if (index <= 0) continue;
+      var key = decodeQueryValue(pairs[i].slice(0, index));
+      var value = decodeQueryValue(pairs[i].slice(index + 1));
+      if (!value) continue;
+      if (key === 'appId') result.appId = value;
+      else if (key === 'env') result.env = value;
+    }
+    return result;
+  }
+
+  function decodeQueryValue(value) {
+    try {
+      return decodeURIComponent(String(value).replace(/\+/g, ' '));
+    } catch (error) {
+      return String(value);
+    }
   }
 
   // 负数/NaN 统一归零，避免上报 -navigationStart 这类脏数据
@@ -271,9 +309,12 @@
 
   function buildConfig(options) {
     var opts = options || {};
+    var serverUrl = readString(opts, 'serverUrl', DEFAULT_CONFIG.serverUrl);
+    var endpoint = parseEndpointOptions(serverUrl);
     return {
-      serverUrl: readString(opts, 'serverUrl', DEFAULT_CONFIG.serverUrl),
-      appId: readString(opts, 'appId', DEFAULT_CONFIG.appId),
+      serverUrl: serverUrl,
+      // 显式配置优先；缺省时回落到 serverUrl 上的 query（脚本标签接入）
+      appId: readString(opts, 'appId', DEFAULT_CONFIG.appId) || endpoint.appId,
       userId: readString(opts, 'userId', DEFAULT_CONFIG.userId),
       autoTrack: readBoolean(opts, 'autoTrack', DEFAULT_CONFIG.autoTrack),
       debug: readBoolean(opts, 'debug', DEFAULT_CONFIG.debug),
@@ -290,7 +331,7 @@
       persistFailed: readBoolean(opts, 'persistFailed', DEFAULT_CONFIG.persistFailed),
       maxQueueSize: readNumber(opts, 'maxQueueSize', DEFAULT_CONFIG.maxQueueSize),
       contentType: readString(opts, 'contentType', DEFAULT_CONFIG.contentType),
-      env: readString(opts, 'env', DEFAULT_CONFIG.env),
+      env: readString(opts, 'env', DEFAULT_CONFIG.env) || endpoint.env,
       signSecret: readString(opts, 'signSecret', DEFAULT_CONFIG.signSecret)
     };
   }
@@ -1500,6 +1541,97 @@
   }
 
   TrackerSDK.version = SDK_VERSION;
+
+  /* ------------------------------------------------------------------ *
+   * 脚本标签接入（loader stub）
+   *
+   * 页面里只需要：
+   *   <script>
+   *     window.__flywayTrack = window.__flywayTrack || [];
+   *     window.__flywayTrack.push(['init', { serverUrl: '...?appId=&env=' }]);
+   *     // 插入 <script id="flyway-track-sdk" src="..."> 异步加载
+   *   </script>
+   * SDK 加载后回放队列并自动初始化；也支持直接用
+   * <script id="flyway-track-sdk" data-server-url="...?appId=&env=" src="..."> 免队列初始化。
+   * ------------------------------------------------------------------ */
+
+  function readCommand(raw) {
+    if (!raw || typeof raw !== 'object' || typeof raw.length !== 'number' || !raw.length) return null;
+    return { name: String(raw[0] || ''), args: Array.prototype.slice.call(raw, 1) };
+  }
+
+  function readScriptOptions(script) {
+    if (!script || typeof script.getAttribute !== 'function') return null;
+    var serverUrl = script.getAttribute('data-server-url');
+    if (!serverUrl) return null;
+    var options = { serverUrl: serverUrl };
+    var appId = script.getAttribute('data-app-id');
+    var env = script.getAttribute('data-env');
+    if (appId) options.appId = appId;
+    if (env) options.env = env;
+    return options;
+  }
+
+  function dispatchCommand(instance, command) {
+    try {
+      if (command.name === 'init') {
+        instance.updateConfig(command.args[0] || {});
+      } else if (command.name === 'track' || command.name === 'trackEvent') {
+        instance.track(command.args[0], command.args[1]);
+      } else if (command.name === 'flush') {
+        instance.flush();
+      }
+    } catch (error) {
+      console.warn('TrackerSDK: 回放队列指令失败:', command.name, error);
+    }
+  }
+
+  function bootstrapFromPage(Constructor) {
+    if (typeof window === 'undefined' || !window.document) return null;
+    var page = window;
+    var queue = page[GLOBAL_QUEUE_KEY];
+
+    // 已初始化过：重复加载脚本时不要创建第二个实例
+    if (queue && queue.instance) return queue.instance;
+
+    var initOptions = null;
+    var pending = [];
+    if (queue && typeof queue.length === 'number') {
+      for (var i = 0; i < queue.length; i += 1) {
+        var command = readCommand(queue[i]);
+        if (!command) continue;
+        if (command.name === 'init') initOptions = command.args[0] || initOptions;
+        else pending.push(command);
+      }
+    }
+
+    if (!initOptions) {
+      var script = page.document.currentScript;
+      if (!script && typeof page.document.getElementById === 'function') {
+        script = page.document.getElementById(SCRIPT_ID);
+      }
+      initOptions = readScriptOptions(script);
+    }
+    if (!initOptions || !initOptions.serverUrl) return null;
+
+    var instance = new Constructor(initOptions);
+    for (var j = 0; j < pending.length; j += 1) dispatchCommand(instance, pending[j]);
+
+    // 队列换成转发器：SDK 加载之后再 push 的指令也能生效
+    var forwarder = [];
+    forwarder.push = function (raw) {
+      var parsed = readCommand(raw);
+      if (!parsed) return 0;
+      if (parsed.name === 'init') instance.updateConfig(parsed.args[0] || {});
+      else dispatchCommand(instance, parsed);
+      return 0;
+    };
+    forwarder.instance = instance;
+    page[GLOBAL_QUEUE_KEY] = forwarder;
+    return instance;
+  }
+
+  bootstrapFromPage(TrackerSDK);
 
   return TrackerSDK;
 });

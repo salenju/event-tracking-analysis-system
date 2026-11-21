@@ -1,6 +1,6 @@
 {
   "name": "flyway-track-sdk",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "A powerful frontend analytics tracking SDK with performance monitoring, user behavior tracking, and error monitoring capabilities",
   "main": "flyway-track-sdk.js",
   "unpkg": "dist/flyway-track-sdk.min.js",

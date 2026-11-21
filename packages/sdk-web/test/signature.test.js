@@ -204,7 +204,7 @@ test('payload 携带 env，便于服务端隔离测试数据', async () => {
 
   const payload = JSON.parse(harness.fetchCalls[0].body);
   assert.equal(payload.env, 'test');
-  assert.equal(payload.sdkVersion, '2.1.1');
+  assert.equal(payload.sdkVersion, '2.2.0');
 
   await tracker.destroy();
 });

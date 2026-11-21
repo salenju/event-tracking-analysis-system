@@ -2,7 +2,7 @@
 
 一个功能完整、可自测的前端数据埋点 SDK，支持自动性能监控、用户行为追踪、错误监控与可靠上报。
 
-当前版本：**v2.1.1**（v2.1.0 的兼容升级，新增签名与 env，见 docs/CHANGELOG.md）
+当前版本：**v2.2.0**（新增脚本标签接入：appId/env 可只写在 serverUrl、支持全局队列自动初始化，见 docs/CHANGELOG.md）
 
 ## 🚀 主要特性
 
@@ -72,6 +72,31 @@ const tracker = new TrackerSDK({
     debug: false,
 });
 ```
+
+### 脚本标签接入（免配置 appId / env）
+
+`appId` 与 `env` 可以直接写在 `serverUrl` 的 query 上，构造函数只留 `serverUrl`：
+
+```html
+<script>
+(function (w, d, s) {
+  if (d.getElementById('flyway-track-sdk')) return;
+  w.__flywayTrack = w.__flywayTrack || [];
+  w.__flywayTrack.push(['init', { serverUrl: 'https://track.example.com/api/track?appId=xxx&env=test' }]);
+  var first = d.getElementsByTagName(s)[0];
+  var el = d.createElement(s);
+  el.id = 'flyway-track-sdk';
+  el.async = true;
+  el.src = 'https://track.example.com/sdk/flyway-track-sdk.min.js';
+  first.parentNode.insertBefore(el, first);
+})(window, document, 'script');
+</script>
+```
+
+- SDK 加载后会回放 `window.__flywayTrack` 里的指令并自动初始化；之后的 `push(['track', 'event', {...}])` 也会转发到实例。
+- 也可以省掉队列，直接 `<script id="flyway-track-sdk" data-server-url="...?appId=&env=" data-env="test" src="...">`。
+- 构造参数里的 `appId` / `env` 优先级高于 URL；`userId`、采样率等仍需显式配置。
+- 注意：这种形态不携带签名，服务端需 `SIGN_REQUIRED=false`（只做 appId 白名单 + 限流）。
 
 ### 完整配置
 ```javascript
@@ -164,7 +189,7 @@ tracker.setOptOut(false);  // 恢复
 ```javascript
 {
     appId: 'your-app-id',
-    sdkVersion: '2.1.1',
+    sdkVersion: '2.2.0',
     userId: 'user-123',
     sessionId: 'sess_1750000000000_ab12cd34e',
     batchId: 'batch_1750000000500_xy98zw76q',
@@ -237,7 +262,7 @@ opt-out / destroy 清理 / 停留时长不重复 / 指标阶段与 CLS 算法 / 
 const tracker = new TrackerSDK({ debug: true /* ... */ });
 ```
 
-控制台输出：`[TrackerSDK] TrackerSDK 2.1.1 initialized successfully`、`Reporting <type>:`、`Batch sent via sendBeacon:`。
+控制台输出：`[TrackerSDK] TrackerSDK 2.2.0 initialized successfully`、`Reporting <type>:`、`Batch sent via sendBeacon:`。
 
 `debug` 仅控制日志输出，**不会**改变上报行为。
 

@@ -149,7 +149,7 @@ test('公共字段收敛到批次层，并带 sdkVersion', async () => {
   await tracker.flush();
 
   const payload = (await collectPayloads())[0];
-  assert.equal(payload.sdkVersion, '2.1.1');
+  assert.equal(payload.sdkVersion, '2.2.0');
   assert.equal(payload.appId, 'test-app');
   assert.equal(payload.userId, 'user-1');
   assert.ok(payload.sessionId);
@@ -618,6 +618,82 @@ test('切换开关会重建监听，不会重复注册', async () => {
   await tracker.destroy();
 });
 
+/* ------------------------------ 脚本标签接入 ------------------------------ */
+
+test('serverUrl 上的 appId/env 会被采用', async () => {
+  harness = setup();
+  const SDK = loadSdk();
+  const tracker = new SDK(
+    baseOptions({
+      serverUrl: 'https://collect.test/api/track?appId=url-app&env=uat',
+      appId: '',
+      env: ''
+    })
+  );
+
+  assert.equal(tracker.getConfig().appId, 'url-app');
+  assert.equal(tracker.getConfig().env, 'uat');
+
+  await tracker.track('url_event', { a: 1 });
+  await tracker.flush();
+
+  const payloads = await collectPayloads();
+  assert.equal(payloads[0].appId, 'url-app');
+  assert.equal(payloads[0].env, 'uat');
+  await tracker.destroy();
+});
+
+test('显式构造参数优先于 serverUrl 上的 appId/env', () => {
+  harness = setup();
+  const SDK = loadSdk();
+  const tracker = new SDK(
+    baseOptions({
+      serverUrl: 'https://collect.test/api/track?appId=url-app&env=uat',
+      appId: 'explicit-app',
+      env: 'prod'
+    })
+  );
+
+  assert.equal(tracker.getConfig().appId, 'explicit-app');
+  assert.equal(tracker.getConfig().env, 'prod');
+});
+
+test('loader stub：队列里的 init/track 在脚本加载后回放', async () => {
+  harness = setup();
+  harness.window.__flywayTrack = [
+    [
+      'init',
+      {
+        serverUrl: 'https://collect.test/api/track?appId=stub-app&env=dev',
+        autoTrack: false,
+        enableClickTracking: false,
+        enableErrorTracking: false,
+        batchTimeout: 10,
+        retryDelay: 0,
+        persistFailed: false
+      }
+    ],
+    ['track', 'boot_event', { from: 'queue' }]
+  ];
+
+  loadSdk();
+
+  const instance = harness.window.__flywayTrack.instance;
+  assert.ok(instance, '脚本加载后应自动初始化实例');
+  assert.equal(instance.getConfig().appId, 'stub-app');
+  assert.equal(instance.getConfig().env, 'dev');
+
+  // 加载后的 push 仍然生效（队列被替换成转发器）
+  harness.window.__flywayTrack.push(['track', 'after_event', { from: 'forwarder' }]);
+  await tick(50);
+
+  const records = allRecords(await collectPayloads());
+  const names = records.filter((record) => record.data && record.data.event).map((record) => record.data.event);
+  assert.ok(names.indexOf('boot_event') !== -1, '加载前的指令应被回放');
+  assert.ok(names.indexOf('after_event') !== -1, '加载后的指令应被转发');
+  await instance.destroy();
+});
+
 /* ------------------------------ 打包形态 ------------------------------ */
 
 test('UMD：支持 CommonJS 导出与浏览器全局挂载', () => {
@@ -625,7 +701,7 @@ test('UMD：支持 CommonJS 导出与浏览器全局挂载', () => {
   const SDK = loadSdk();
 
   assert.equal(typeof SDK, 'function');
-  assert.equal(SDK.version, '2.1.1');
+  assert.equal(SDK.version, '2.2.0');
 
   const source = fs.readFileSync(SDK_PATH, 'utf8');
   const sandbox = {};

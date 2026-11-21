@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { FilterQuery, FunnelDef } from '@/api/types';
-import { defaultRange, rangeShortcuts } from '@/utils/filters';
+import { COUNTRY_OPTIONS, ENV_OPTIONS, defaultRange, rangeShortcuts } from '@/utils/filters';
 
 const props = defineProps<{
   funnels: FunnelDef[];
@@ -45,8 +45,8 @@ function onWalletTypeInput(value: string): void {
   update({ walletType: value });
 }
 
-function onCountryInput(value: string): void {
-  update({ country: value.trim().toUpperCase() });
+function onCountryChange(value: string | null | undefined): void {
+  update({ country: (value ?? '').trim().toUpperCase() });
 }
 
 function onDeviceChange(value: string): void {
@@ -91,9 +91,7 @@ function reset(): void {
 
     <el-form-item label="环境">
       <el-select :model-value="modelValue.env" style="width: 108px" @change="onEnvChange">
-        <el-option label="prod" value="prod" />
-        <el-option label="test" value="test" />
-        <el-option label="staging" value="staging" />
+        <el-option v-for="item in ENV_OPTIONS" :key="item" :label="item" :value="item" />
       </el-select>
     </el-form-item>
 
@@ -108,14 +106,18 @@ function reset(): void {
     </el-form-item>
 
     <el-form-item label="国家">
-      <el-input
+      <el-select
         :model-value="modelValue.country"
         placeholder="全部"
-        maxlength="2"
+        filterable
+        allow-create
+        default-first-option
         clearable
-        style="width: 96px"
-        @update:model-value="onCountryInput"
-      />
+        style="width: 150px"
+        @change="onCountryChange"
+      >
+        <el-option v-for="item in COUNTRY_OPTIONS" :key="item.value" :label="item.label" :value="item.value" />
+      </el-select>
     </el-form-item>
 
     <el-form-item label="设备">

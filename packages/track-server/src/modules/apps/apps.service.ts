@@ -97,6 +97,7 @@ export class AppsService {
     const store = this.store;
     const name = assertName(input.name);
     const env = input.env ? assertEnv(input.env) : this.deps.config.trackEnv;
+    await this.assertNameAvailable(store, name, env);
     const remark = input.remark?.trim() ? input.remark.trim().slice(0, 255) : null;
     const now = this.now();
     const secret = randomBytes(24).toString('hex');
@@ -133,6 +134,13 @@ export class AppsService {
     if (patch.env !== undefined) normalized.env = assertEnv(patch.env);
     if (patch.status !== undefined) normalized.status = patch.status;
     if (patch.remark !== undefined) normalized.remark = patch.remark?.trim() ? patch.remark.trim().slice(0, 255) : null;
+
+    // 改名或换环境时才校验，避免改名未变也去扫表
+    const nextName = normalized.name ?? existing.name;
+    const nextEnv = normalized.env ?? existing.env;
+    if (nextName !== existing.name || nextEnv !== existing.env) {
+      await this.assertNameAvailable(this.store, nextName, nextEnv, existing.appId);
+    }
 
     await this.store.update(existing.appId, normalized, this.now());
     // 停用后必须立刻让验签侧看到，不能等缓存过期
@@ -182,6 +190,24 @@ export class AppsService {
     const updated = await this.deps.users.findById(target.id);
     if (!updated) throw new NotFoundError('用户不存在');
     return toPublicUser(updated);
+  }
+
+  /**
+   * 同一环境下应用名唯一：一个业务按环境建多条应用是允许的，但同环境重名会让人分不清
+   * 到底该把哪套 appId 配进 SDK，因此在应用层拦住（库里 name 无唯一索引，避免历史数据迁移失败）。
+   */
+  private async assertNameAvailable(
+    store: AppStore,
+    name: string,
+    env: string,
+    excludeAppId?: string,
+  ): Promise<void> {
+    const key = name.trim().toLowerCase();
+    const apps = await store.list();
+    const duplicated = apps.find(
+      (item) => item.appId !== excludeAppId && item.env === env && item.name.trim().toLowerCase() === key,
+    );
+    if (duplicated) throw new ConflictError(`环境 ${env} 下已存在同名应用「${duplicated.name}」`);
   }
 
   private async findEditable(appId: string): Promise<AnalyticsApp> {

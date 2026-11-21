@@ -54,6 +54,10 @@ export function registerAppsRoutes(app: FastifyInstance, deps: AppsRouteDeps): v
       signWindowSeconds: deps.config.signWindowSeconds,
       trackPath: '/api/track',
       env: deps.config.trackEnv,
+      /** 空字符串表示前端用当前站点 origin 拼完整地址 */
+      publicBaseUrl: deps.config.trackPublicBaseUrl,
+      /** 空字符串表示前端按 <base>/sdk/flyway-track-sdk.min.js 拼 */
+      sdkUrl: deps.config.sdkPublicUrl,
     },
   }));
 

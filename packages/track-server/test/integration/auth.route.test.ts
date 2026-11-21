@@ -179,6 +179,47 @@ describe('登录鉴权与管理员接口', () => {
     expect(ingest.json()).toMatchObject({ ok: true, accepted: 1 });
   });
 
+  it('同一环境下应用名不可重复，不同环境允许同名', async () => {
+    const { token } = await devLogin('alice');
+    const headers = { authorization: `Bearer ${token}` };
+
+    const first = await app.inject({
+      method: 'POST',
+      url: '/api/admin/apps',
+      headers,
+      payload: { name: 'Storefront', env: 'prod' },
+    });
+    expect(first.statusCode).toBe(200);
+
+    // 大小写与首尾空格差异也算重复
+    const duplicated = await app.inject({
+      method: 'POST',
+      url: '/api/admin/apps',
+      headers,
+      payload: { name: '  storefront ', env: 'prod' },
+    });
+    expect(duplicated.statusCode).toBe(409);
+    expect((duplicated.json() as { message: string }).message).toContain('同名应用');
+
+    const otherEnv = await app.inject({
+      method: 'POST',
+      url: '/api/admin/apps',
+      headers,
+      payload: { name: 'Storefront', env: 'test' },
+    });
+    expect(otherEnv.statusCode).toBe(200);
+
+    // 改名撞到同环境已有名称也要拦住
+    const second = (otherEnv.json() as { app: { appId: string } }).app;
+    const renamed = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/apps/${second.appId}`,
+      headers,
+      payload: { env: 'prod' },
+    });
+    expect(renamed.statusCode).toBe(409);
+  });
+
   it('轮换密钥后旧密钥立即失效，新密钥可用', async () => {
     const { token } = await devLogin('alice');
     const headers = { authorization: `Bearer ${token}` };

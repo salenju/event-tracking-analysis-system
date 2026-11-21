@@ -32,9 +32,14 @@ services:
       DB_NAME: event_tracking
       # 存量应用的静态密钥；新建应用请用管理后台（写 analytics_apps 表），不再改这里
       APP_SECRETS: '{"fylinking-storefront":"local-dev-secret"}'
+      # 脚本标签接入（后台一键复制的接入代码）不带签名密钥，需保持 false
       SIGN_REQUIRED: 'false'
       CORS_ORIGINS: '*'
       TRACK_ENV: prod
+      # 后台生成的接入地址用这个域名（含协议）；留空则用看板当前站点 origin
+      PUBLIC_TRACK_BASE_URL: ''
+      # SDK 静态文件地址；留空则按 <base>/sdk/flyway-track-sdk.min.js 拼接
+      SDK_PUBLIC_URL: ''
       LOG_LEVEL: info
       # 看板登录：飞书开放平台「网页应用」凭证
       FEISHU_APP_ID: ''

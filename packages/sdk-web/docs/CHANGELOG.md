@@ -1,5 +1,20 @@
 # Changelog
 
+## v2.2.0（2026-11-21）
+
+脚本标签接入（loader stub），让接入方「复制一段 script 贴进页面」即可上报，不必在构造函数里配 `appId` / `env`。**向后兼容**：不写 URL 参数、不用队列时行为与 2.1.1 完全一致。
+
+### 新增
+
+- **端点自解析**：`serverUrl` 上的 `?appId=&env=` 会被解析为配置，构造函数里的同名参数优先。
+- **全局指令队列**：页面可在 SDK 加载前写 `window.__flywayTrack.push(['init', { serverUrl }])` 与 `push(['track', name, props])`；SDK 加载后回放，并把队列替换为转发器（`.instance` 暴露实例）。支持 `init` / `track` / `trackEvent` / `flush` 四种指令。
+- **data-* 初始化**：`<script id="flyway-track-sdk" data-server-url="...?appId=&env=" data-env="test" src="...">` 可免队列自动初始化；重复加载脚本时复用已有实例。
+- 服务端配套：报文里 `appId` 允许缺省（只认验签结果）、`env` 支持从 query 读取，见 `packages/track-server`。
+
+### 安全说明
+
+脚本标签接入不带签名，需服务端 `SIGN_REQUIRED=false`，防护退化为 appId 白名单 + 限流。需要签名时继续用 `new TrackerSDK({ serverUrl, appId, env, signSecret })`。
+
 ## v2.1.1（2026-11-21）
 
 配合埋点服务端（`packages/track-server`）落地，做 4 处必要改造。**不改变已有配置的默认行为**，未设置 `signSecret` / `env` 时上报内容与 2.1.0 一致。

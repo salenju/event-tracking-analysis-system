@@ -239,7 +239,14 @@ const MOCK_APPS = [
   },
 ];
 
-const SIGNING = { signRequired: true, signWindowSeconds: 300, trackPath: '/api/track', env: 'prod' };
+const SIGNING = {
+  signRequired: false,
+  signWindowSeconds: 300,
+  trackPath: '/api/track',
+  env: 'prod',
+  publicBaseUrl: '',
+  sdkUrl: '',
+};
 
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? '/', `http://127.0.0.1:${PORT}`);
