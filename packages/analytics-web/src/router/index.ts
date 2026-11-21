@@ -16,6 +16,12 @@ const router = createRouter({
       component: () => import('@/views/OverviewView.vue'),
       meta: { title: '事件概览' },
     },
+    {
+      path: '/experience',
+      name: 'experience',
+      component: () => import('@/views/ExperienceView.vue'),
+      meta: { title: '体验指标' },
+    },
     { path: '/:pathMatch(.*)*', redirect: '/funnel' },
   ],
 });

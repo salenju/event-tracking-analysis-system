@@ -38,6 +38,15 @@ describe('funnel sql', () => {
     expect(sql).toContain('MIN(IF(`event` = ? AND wallet_type = ?, occurred_at, NULL)) AS t1');
   });
 
+  it('国家/设备维度过滤追加在 WHERE 中，参数顺序一致', () => {
+    const { sql, params } = buildSessionStepTimesSql({ ...base, country: 'SG', deviceType: 'mobile' });
+    expect(countPlaceholders(sql)).toBe(params.length);
+    // 5 个步骤 + appId/env/country/device/from/to（6 个）+ IN 列表 5 个
+    expect(params).toHaveLength(5 + 6 + 5);
+    expect(sql).toContain('app_id = ? AND env = ? AND country = ? AND device_type = ?');
+    expect(params.slice(5, 11)).toEqual(['test-app', 'prod', 'SG', 'mobile', base.from, base.to]);
+  });
+
   it('聚合 SQL：窗口参数在前（SELECT 列表先于 FROM 子查询）', () => {
     const { sql, params } = buildFunnelSql(base);
     expect(countPlaceholders(sql)).toBe(params.length);

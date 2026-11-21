@@ -6,6 +6,10 @@ export interface EventRow {
   batchId: string;
   appId: string;
   env: string;
+  /** 来自网关地理头，批次内所有记录相同 */
+  country: string | null;
+  deviceType: string | null;
+  urlPath: string | null;
   recordType: string;
   event: string | null;
   userId: string | null;
@@ -26,6 +30,9 @@ export interface NormalizeContext {
   userId: string | null;
   receivedAt: Date;
   maxRecordBytes: number;
+  country?: string | null;
+  deviceType?: string | null;
+  urlPath?: string | null;
 }
 
 export type NormalizeOutcome = { ok: true; row: EventRow } | { ok: false; reason: string };
@@ -93,6 +100,9 @@ export function normalizeRecord(input: unknown, ctx: NormalizeContext): Normaliz
       batchId: ctx.batchId,
       appId: ctx.appId,
       env: ctx.env,
+      country: truncate(ctx.country, 2),
+      deviceType: truncate(ctx.deviceType, 16),
+      urlPath: truncate(ctx.urlPath, 255),
       recordType,
       event,
       userId: truncate(ctx.userId, COLUMN_LIMITS.userId),

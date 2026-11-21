@@ -4,6 +4,7 @@ import type { Db } from './lib/db.js';
 import { loggerOptions } from './lib/logger.js';
 import { FixedWindowLimiter } from './lib/rate-limiter.js';
 import { findFunnel, type FunnelDef } from './modules/funnel/funnel.config.js';
+import { registerExperienceRoutes } from './modules/experience/experience.route.js';
 import { registerFunnelRoutes } from './modules/funnel/funnel.route.js';
 import { registerIngestRoutes } from './modules/ingest/ingest.route.js';
 import { registerOverviewRoutes } from './modules/overview/overview.route.js';
@@ -58,6 +59,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   if (mode !== 'ingest') {
     registerFunnelRoutes(app, { config: deps.config, db: deps.db, funnels: deps.funnels });
     registerOverviewRoutes(app, { config: deps.config, db: deps.db, funnels: deps.funnels });
+    registerExperienceRoutes(app, { config: deps.config, db: deps.db, funnels: deps.funnels });
   }
 
   app.setNotFoundHandler((request, reply) =>

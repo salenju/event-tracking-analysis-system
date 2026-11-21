@@ -17,6 +17,8 @@ export interface StepTimesQuery {
   from: Date;
   to: Date;
   walletType?: string;
+  country?: string;
+  deviceType?: string;
 }
 
 export interface FunnelQuery extends StepTimesQuery {
@@ -51,14 +53,26 @@ export function buildSessionStepTimesSql(query: StepTimesQuery): SqlParts {
     selectParts.push(`MIN(IF(${condition}, occurred_at, NULL)) AS t${index}`);
   });
 
+  // 国家/设备是每条记录都有的属性，作用在 WHERE 上（钱包类型建会话时可能还没有，只能按步骤过滤）
+  const filters: string[] = ['app_id = ?', 'env = ?'];
+  const filterParams: unknown[] = [query.appId, query.env];
+  if (query.country) {
+    filters.push('country = ?');
+    filterParams.push(query.country);
+  }
+  if (query.deviceType) {
+    filters.push('device_type = ?');
+    filterParams.push(query.deviceType);
+  }
+
   const inList = query.steps.map(() => '?').join(',');
   const sql = `SELECT ${selectParts.join(', ')}
       FROM events
-     WHERE app_id = ? AND env = ? AND record_type = 'event'
+     WHERE ${filters.join(' AND ')} AND record_type = 'event'
        AND occurred_at >= ? AND occurred_at < ?
        AND \`event\` IN (${inList})
      GROUP BY session_id`;
-  params.push(query.appId, query.env, query.from, query.to, ...query.steps);
+  params.push(...filterParams, query.from, query.to, ...query.steps);
 
   return { sql, params };
 }
@@ -117,13 +131,26 @@ export interface OverviewQuery {
   tzOffset: string;
   granularity: 'hour' | 'day';
   events?: string[];
+  country?: string;
+  deviceType?: string;
   limit: number;
 }
 
 export function buildOverviewSql(query: OverviewQuery): SqlParts {
   const tzFormat = query.granularity === 'hour' ? '%Y-%m-%d %H:00:00' : '%Y-%m-%d';
   const bucket = `DATE_FORMAT(CONVERT_TZ(occurred_at, '+00:00', ?), '${tzFormat}')`;
-  const params: unknown[] = [query.tzOffset, query.appId, query.env, query.from, query.to];
+  const params: unknown[] = [query.tzOffset, query.appId, query.env];
+
+  let dimensionFilter = '';
+  if (query.country) {
+    dimensionFilter += ' AND country = ?';
+    params.push(query.country);
+  }
+  if (query.deviceType) {
+    dimensionFilter += ' AND device_type = ?';
+    params.push(query.deviceType);
+  }
+  params.push(query.from, query.to);
 
   let eventFilter = '';
   if (query.events && query.events.length > 0) {

@@ -19,6 +19,7 @@ const activePath = computed(() => route.path);
       <el-menu :default-active="activePath" mode="horizontal" router class="app-nav">
         <el-menu-item index="/funnel">转化漏斗</el-menu-item>
         <el-menu-item index="/overview">事件概览</el-menu-item>
+        <el-menu-item index="/experience">体验指标</el-menu-item>
       </el-menu>
     </header>
 

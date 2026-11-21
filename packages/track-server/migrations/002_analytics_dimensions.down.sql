@@ -1,0 +1,29 @@
+ALTER TABLE events
+  DROP KEY idx_url_path,
+  DROP KEY idx_device,
+  DROP KEY idx_country,
+  DROP KEY idx_type_time,
+  DROP COLUMN stay_ms,
+  DROP COLUMN cls_score,
+  DROP COLUMN inp_ms,
+  DROP COLUMN load_ms,
+  DROP COLUMN ttfb_ms,
+  DROP COLUMN lcp_ms,
+  DROP COLUMN fcp_ms,
+  DROP COLUMN perf_stage,
+  DROP COLUMN url_path,
+  DROP COLUMN device_type,
+  DROP COLUMN country;
+
+ALTER TABLE event_batches
+  DROP KEY idx_country_time,
+  DROP COLUMN lang,
+  DROP COLUMN referrer,
+  DROP COLUMN url_path,
+  DROP COLUMN browser,
+  DROP COLUMN os,
+  DROP COLUMN device_type,
+  DROP COLUMN ua,
+  DROP COLUMN region,
+  DROP COLUMN country,
+  DROP COLUMN ip;

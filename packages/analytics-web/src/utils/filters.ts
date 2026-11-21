@@ -27,6 +27,8 @@ export function createEmptyQuery(): FilterQuery {
     appId: '',
     env: 'prod',
     walletType: '',
+    country: '',
+    deviceType: '',
     from: from.toISOString(),
     to: to.toISOString(),
   };
@@ -39,6 +41,8 @@ export function buildDefaultQuery(funnel: FunnelDef): FilterQuery {
     appId: funnel.appId,
     env: funnel.env,
     walletType: '',
+    country: '',
+    deviceType: '',
     from: from.toISOString(),
     to: to.toISOString(),
   };

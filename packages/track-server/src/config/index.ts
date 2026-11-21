@@ -44,6 +44,18 @@ const envSchema = z.object({
   DEFAULT_TIMEZONE_OFFSET: z.string().regex(tzOffset, 'must look like +08:00').default('+08:00'),
   FUNNELS_PATH: z.string().optional(),
 
+  // 客户端 IP 与地理信息由网关透传，服务端不再自己做 GeoIP 反查。
+  // 按顺序取第一个命中的请求头，逗号分隔。
+  CLIENT_IP_HEADERS: z
+    .string()
+    .default('x-real-ip,x-forwarded-for,x-client-ip'),
+  GEO_COUNTRY_HEADERS: z
+    .string()
+    .default('cf-ipcountry,x-client-geo-country,x-geo-country,x-country-code,x-client-geo-loc,cloudfront-viewer-country'),
+  GEO_REGION_HEADERS: z
+    .string()
+    .default('x-client-geo-region,x-geo-region,x-region'),
+
   LOG_LEVEL: z.string().default('info'),
 });
 
@@ -78,6 +90,16 @@ export interface AppConfig {
   defaultTzOffset: string;
   funnelsPath?: string;
   logLevel: string;
+  clientIpHeaders: string[];
+  geoCountryHeaders: string[];
+  geoRegionHeaders: string[];
+}
+
+function splitList(raw: string): string[] {
+  return raw
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
 }
 
 function parseSecrets(raw: string): Record<string, string> {
@@ -136,6 +158,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     trackEnv: data.TRACK_ENV,
     defaultTzOffset: data.DEFAULT_TIMEZONE_OFFSET,
     logLevel: data.LOG_LEVEL,
+    clientIpHeaders: splitList(data.CLIENT_IP_HEADERS),
+    geoCountryHeaders: splitList(data.GEO_COUNTRY_HEADERS),
+    geoRegionHeaders: splitList(data.GEO_REGION_HEADERS),
   };
   if (data.FUNNELS_PATH) cfg.funnelsPath = data.FUNNELS_PATH;
   return cfg;

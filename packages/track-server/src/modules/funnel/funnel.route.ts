@@ -32,6 +32,8 @@ export function registerFunnelRoutes(app: FastifyInstance, deps: FunnelRouteDeps
     const funnel = findFunnel(deps.funnels, readString(query, 'key'));
     const range = parseTimeRange(readString(query, 'from'), readString(query, 'to'));
     const walletType = readString(query, 'walletType');
+    const country = readString(query, 'country')?.toUpperCase();
+    const deviceType = readString(query, 'deviceType');
     const appId = readString(query, 'appId');
     const env = readString(query, 'env');
 
@@ -39,6 +41,8 @@ export function registerFunnelRoutes(app: FastifyInstance, deps: FunnelRouteDeps
       from: range.from,
       to: range.to,
       ...(walletType ? { walletType } : {}),
+      ...(country ? { country } : {}),
+      ...(deviceType ? { deviceType } : {}),
       ...(appId ? { appId } : {}),
       ...(env ? { env } : {}),
     });
@@ -53,6 +57,8 @@ export function registerFunnelRoutes(app: FastifyInstance, deps: FunnelRouteDeps
     const limit = readInt(query, 'limit', { fallback: 20, min: 1, max: 200 });
     const offset = readInt(query, 'offset', { fallback: 0, min: 0, max: 100000 });
     const walletType = readString(query, 'walletType');
+    const country = readString(query, 'country')?.toUpperCase();
+    const deviceType = readString(query, 'deviceType');
     const appId = readString(query, 'appId');
     const env = readString(query, 'env');
 
@@ -63,6 +69,8 @@ export function registerFunnelRoutes(app: FastifyInstance, deps: FunnelRouteDeps
       limit,
       offset,
       ...(walletType ? { walletType } : {}),
+      ...(country ? { country } : {}),
+      ...(deviceType ? { deviceType } : {}),
       ...(appId ? { appId } : {}),
       ...(env ? { env } : {}),
     });

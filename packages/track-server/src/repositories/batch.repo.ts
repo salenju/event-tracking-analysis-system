@@ -7,6 +7,16 @@ export interface BatchRow {
   env: string;
   recordCount: number;
   receivedAt: Date;
+  ip?: string | null;
+  country?: string | null;
+  region?: string | null;
+  ua?: string | null;
+  deviceType?: string | null;
+  os?: string | null;
+  browser?: string | null;
+  urlPath?: string | null;
+  referrer?: string | null;
+  lang?: string | null;
 }
 
 /**
@@ -16,9 +26,27 @@ export interface BatchRow {
 export async function insertBatchIfAbsent(connection: DbConnection, row: BatchRow): Promise<boolean> {
   try {
     await connection.query(
-      `INSERT INTO event_batches (batch_id, app_id, env, record_count, received_at)
-       VALUES (?, ?, ?, ?, ?)`,
-      [row.batchId, row.appId, row.env, row.recordCount, row.receivedAt],
+      `INSERT INTO event_batches
+         (batch_id, app_id, env, record_count, received_at,
+          ip, country, region, ua, device_type, os, browser, url_path, referrer, lang)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        row.batchId,
+        row.appId,
+        row.env,
+        row.recordCount,
+        row.receivedAt,
+        row.ip ?? null,
+        row.country ?? null,
+        row.region ?? null,
+        row.ua ?? null,
+        row.deviceType ?? null,
+        row.os ?? null,
+        row.browser ?? null,
+        row.urlPath ?? null,
+        row.referrer ?? null,
+        row.lang ?? null,
+      ],
     );
     return true;
   } catch (error) {

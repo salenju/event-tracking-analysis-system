@@ -12,6 +12,9 @@ function context(overrides: Partial<NormalizeContext> = {}): NormalizeContext {
     userId: 'u_1',
     receivedAt,
     maxRecordBytes: 16384,
+    country: 'SG',
+    deviceType: 'mobile',
+    urlPath: '/pay/1001',
     ...overrides,
   };
 }
@@ -33,6 +36,30 @@ describe('normalizeRecord', () => {
     expect(outcome.row.walletType).toBe('metamask');
     expect(outcome.row.failReason).toBe('x');
     expect(outcome.row.recordType).toBe('event');
+  });
+
+  it('批次级维度（国家/设备/页面）会写入每条记录', () => {
+    const outcome = normalizeRecord(
+      { type: 'event', timestamp: receivedAt.getTime(), data: { event: 'cashier_view', properties: {} } },
+      context(),
+    );
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.row.country).toBe('SG');
+    expect(outcome.row.deviceType).toBe('mobile');
+    expect(outcome.row.urlPath).toBe('/pay/1001');
+  });
+
+  it('缺少维度时写入 null，不写空串', () => {
+    const outcome = normalizeRecord(
+      { type: 'event', timestamp: receivedAt.getTime(), data: { event: 'cashier_view', properties: {} } },
+      context({ country: null, deviceType: null, urlPath: null }),
+    );
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.row.country).toBeNull();
+    expect(outcome.row.deviceType).toBeNull();
+    expect(outcome.row.urlPath).toBeNull();
   });
 
   it('兼容 snake_case 维度字段', () => {

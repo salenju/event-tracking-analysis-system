@@ -35,24 +35,32 @@ const option = computed<EChartsCoreOption>(() => {
         right: '8%',
         top: 16,
         bottom: 12,
-        minSize: '22%',
+        minSize: '30%',
         maxSize: '100%',
-        gap: 6,
+        gap: 4,
         label: {
           show: true,
           position: 'inside',
-          color: '#fff',
-          fontSize: 12,
-          fontWeight: 500,
           formatter: (params: unknown) => {
             const item = params as { dataIndex: number };
             const step = steps[item.dataIndex];
             if (!step) return '';
-            return `${eventLabel(step.event)}  ${formatNumber(step.count)}`;
+            // 第一行：步骤名 + 到达人数；第二行：相对上一步转化率 + 总转化率
+            const stepRate = step.index === 0 ? '起点' : formatPercent(step.rateFromPrevious);
+            return [
+              `{name|${eventLabel(step.event)}  ${formatNumber(step.count)}}`,
+              `{stepRate|转化 ${stepRate}}{gap| · }{totalRate|总 ${formatPercent(step.rateFromStart)}}`,
+            ].join('\n');
+          },
+          rich: {
+            name: { fontSize: 12, fontWeight: 600, color: '#fff', lineHeight: 19 },
+            stepRate: { fontSize: 11, color: '#fff', lineHeight: 15 },
+            gap: { fontSize: 11, color: 'rgba(255,255,255,0.65)', lineHeight: 15 },
+            totalRate: { fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 15 },
           },
         },
         itemStyle: { borderWidth: 0 },
-        emphasis: { label: { fontSize: 13, fontWeight: 600 } },
+        emphasis: { label: { show: true } },
         data: steps.map((step, index) => ({
           name: eventLabel(step.event),
           value: step.count,
@@ -65,5 +73,5 @@ const option = computed<EChartsCoreOption>(() => {
 </script>
 
 <template>
-  <BaseChart :option="option" height="320px" @chart-click="emit('step-click', $event)" />
+  <BaseChart :option="option" height="360px" @chart-click="emit('step-click', $event)" />
 </template>

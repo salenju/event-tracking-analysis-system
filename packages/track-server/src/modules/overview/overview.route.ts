@@ -27,6 +27,8 @@ export function registerOverviewRoutes(app: FastifyInstance, deps: OverviewRoute
     const tzOffset = normalizeOffset(readString(query, 'tzOffset'), deps.config.defaultTzOffset);
     const events = readStringList(query, 'events');
     const limit = readInt(query, 'limit', { fallback: 2000, min: 1, max: 10000 });
+    const country = readString(query, 'country')?.toUpperCase();
+    const deviceType = readString(query, 'deviceType');
 
     const granularity = pickGranularity(range);
     const { sql, params } = buildOverviewSql({
@@ -38,6 +40,8 @@ export function registerOverviewRoutes(app: FastifyInstance, deps: OverviewRoute
       granularity,
       limit,
       ...(events ? { events } : {}),
+      ...(country ? { country } : {}),
+      ...(deviceType ? { deviceType } : {}),
     });
 
     const rows = await deps.db.query.query<Record<string, unknown>>(sql, params);

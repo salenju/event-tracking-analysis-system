@@ -124,6 +124,80 @@ function buildOverview(now = Date.now()) {
   };
 }
 
+function buildPerformance(now = Date.now()) {
+  return {
+    ok: true,
+    appId: FUNNEL.appId,
+    env: 'prod',
+    from: new Date(now - 6 * 86400_000).toISOString(),
+    to: new Date(now).toISOString(),
+    filters: { country: null, deviceType: null, urlPath: null },
+    sessions: 486,
+    records: 486,
+    metrics: [
+      { key: 'lcp', unit: 'ms', samples: 486, avg: 2680, p50: 2410, p75: 3260, p95: 5120, max: 7820 },
+      { key: 'fcp', unit: 'ms', samples: 486, avg: 1320, p50: 1180, p75: 1680, p95: 2460, max: 3980 },
+      { key: 'ttfb', unit: 'ms', samples: 486, avg: 428, p50: 356, p75: 612, p95: 1180, max: 2340 },
+      { key: 'load', unit: 'ms', samples: 486, avg: 3120, p50: 2890, p75: 3820, p95: 5760, max: 8420 },
+      { key: 'inp', unit: 'ms', samples: 412, avg: 186, p50: 148, p75: 232, p95: 460, max: 880 },
+      { key: 'cls', unit: 'score', samples: 486, avg: 0.082, p50: 0.051, p75: 0.112, p95: 0.238, max: 0.412 },
+    ],
+    byPage: [
+      { key: '/pay/1001', samples: 312, avg: 2510, p75: 3120, max: 6980 },
+      { key: '/pay/1002', samples: 174, avg: 2980, p75: 3680, max: 7820 },
+    ],
+    byCountry: [
+      { key: 'SG', samples: 182, avg: 1980, p75: 2440, max: 5120 },
+      { key: 'HK', samples: 146, avg: 2160, p75: 2680, max: 5460 },
+      { key: 'US', samples: 158, avg: 3860, p75: 4620, max: 7820 },
+    ],
+    byDevice: [
+      { key: 'mobile', samples: 328, avg: 3120, p75: 3860, max: 7820 },
+      { key: 'desktop', samples: 158, avg: 1860, p75: 2280, max: 4980 },
+    ],
+  };
+}
+
+function buildStay(now = Date.now()) {
+  return {
+    ok: true,
+    appId: FUNNEL.appId,
+    env: 'prod',
+    from: new Date(now - 6 * 86400_000).toISOString(),
+    to: new Date(now).toISOString(),
+    filters: { country: null, deviceType: null, urlPath: null },
+    samples: 512,
+    avgMs: 42300,
+    p50: 31200,
+    p75: 58400,
+    p95: 132000,
+    maxMs: 286000,
+    byPage: [
+      { key: 'https://shop.example.com/pay/1001', samples: 318, avg: 46800, p75: 62400, max: 286000 },
+      { key: 'https://shop.example.com/pay/1002', samples: 194, avg: 35200, p75: 48600, max: 158000 },
+    ],
+    byTrigger: [
+      { key: 'pagehide', samples: 372, avg: 44100, p75: 60200, max: 286000 },
+      { key: 'route_change', samples: 140, avg: 38600, p75: 51200, max: 142000 },
+    ],
+  };
+}
+
+function buildIntegrity(now = Date.now()) {
+  return {
+    ok: true,
+    appId: FUNNEL.appId,
+    env: 'prod',
+    from: new Date(now - 6 * 86400_000).toISOString(),
+    to: new Date(now).toISOString(),
+    batches: 1284,
+    expectedRecords: 6420,
+    actualRecords: 6420,
+    missingRecords: 0,
+    mismatchBatches: [],
+  };
+}
+
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? '/', `http://127.0.0.1:${PORT}`);
   const path = url.pathname;
@@ -147,6 +221,9 @@ const server = createServer((request, response) => {
     return json(response, 200, buildSessionDetail(sessionId));
   }
   if (path === '/api/overview/events') return json(response, 200, buildOverview());
+  if (path === '/api/experience/performance') return json(response, 200, buildPerformance());
+  if (path === '/api/experience/stay') return json(response, 200, buildStay());
+  if (path === '/api/meta/integrity') return json(response, 200, buildIntegrity());
 
   return json(response, 404, { ok: false, error: 'not_found', path });
 });

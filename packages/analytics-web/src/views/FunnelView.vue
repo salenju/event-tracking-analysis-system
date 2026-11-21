@@ -135,7 +135,9 @@ function onChartClick(index: number): void {
   <section v-loading="loading" class="page-card">
     <div class="card-title">
       <h3>漏斗图</h3>
-      <span class="hint">点击色块可直接查看该环节流失会话</span>
+      <span class="hint">
+        每个色块：第一行 环节与到达会话数，第二行 相对上一步转化率 · 总转化率；点击色块查看该环节流失会话
+      </span>
     </div>
     <FunnelChart v-if="steps.length" :steps="steps" @step-click="onChartClick" />
     <el-empty v-else description="所选区间暂无数据" class="empty-block" />

@@ -10,6 +10,8 @@ export interface FunnelParams {
   from: Date;
   to: Date;
   walletType?: string;
+  country?: string;
+  deviceType?: string;
 }
 
 export interface FunnelStep {
@@ -33,6 +35,8 @@ export interface FunnelResult {
   from: string;
   to: string;
   walletType: string | null;
+  country: string | null;
+  deviceType: string | null;
   totalSessions: number;
   steps: FunnelStep[];
 }
@@ -64,6 +68,8 @@ export async function computeFunnel(
     windowMinutes: funnel.windowMinutes,
     maxExecutionMs: config.db.queryTimeoutMs,
     ...(params.walletType ? { walletType: params.walletType } : {}),
+    ...(params.country ? { country: params.country } : {}),
+    ...(params.deviceType ? { deviceType: params.deviceType } : {}),
   };
 
   const { sql, params: sqlParams } = buildFunnelSql(query);
@@ -95,6 +101,8 @@ export async function computeFunnel(
     from: params.from.toISOString(),
     to: params.to.toISOString(),
     walletType: params.walletType ?? null,
+    country: params.country ?? null,
+    deviceType: params.deviceType ?? null,
     totalSessions,
     steps,
   };
@@ -137,6 +145,8 @@ export async function listDropOffSessions(
     stepIndex: params.stepIndex,
     limit: params.limit + 1,
     ...(params.walletType ? { walletType: params.walletType } : {}),
+    ...(params.country ? { country: params.country } : {}),
+    ...(params.deviceType ? { deviceType: params.deviceType } : {}),
   };
 
   const { sql, params: sqlParams } = buildDropOffSessionsSql(query);

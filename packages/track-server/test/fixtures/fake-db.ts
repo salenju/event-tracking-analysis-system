@@ -6,12 +6,25 @@ export interface RecordedBatch {
   env: string;
   recordCount: number;
   receivedAt: Date;
+  ip?: string | null;
+  country?: string | null;
+  region?: string | null;
+  ua?: string | null;
+  deviceType?: string | null;
+  os?: string | null;
+  browser?: string | null;
+  urlPath?: string | null;
+  referrer?: string | null;
+  lang?: string | null;
 }
 
 export interface RecordedEventRow {
   batchId: string;
   appId: string;
   env: string;
+  country: string | null;
+  deviceType: string | null;
+  urlPath: string | null;
   recordType: string;
   event: string | null;
   userId: string | null;
@@ -24,7 +37,8 @@ export interface RecordedEventRow {
   receivedAt: Date;
 }
 
-const EVENT_COLUMNS = 13;
+const EVENT_COLUMNS = 16;
+const BATCH_COLUMNS = 15;
 
 /** 内存假库：用于验证路由契约，不需要真实 MySQL */
 export class FakeDb implements Db {
@@ -49,7 +63,8 @@ export class FakeDb implements Db {
         const connection: DbConnection = {
           async query<T = unknown>(sql: string, params: readonly unknown[] = []): Promise<T[]> {
             if (sql.includes('INSERT INTO event_batches')) {
-              const batchId = String(params[0]);
+              const chunk = params.slice(0, BATCH_COLUMNS);
+              const batchId = String(chunk[0]);
               if (owner.batches.some((item) => item.batchId === batchId)) {
                 const error = new Error('Duplicate entry') as Error & { code?: string; errno?: number };
                 error.code = 'ER_DUP_ENTRY';
@@ -58,10 +73,20 @@ export class FakeDb implements Db {
               }
               owner.batches.push({
                 batchId,
-                appId: String(params[1]),
-                env: String(params[2]),
-                recordCount: Number(params[3]),
-                receivedAt: params[4] as Date,
+                appId: String(chunk[1]),
+                env: String(chunk[2]),
+                recordCount: Number(chunk[3]),
+                receivedAt: chunk[4] as Date,
+                ip: (chunk[5] as string | null) ?? null,
+                country: (chunk[6] as string | null) ?? null,
+                region: (chunk[7] as string | null) ?? null,
+                ua: (chunk[8] as string | null) ?? null,
+                deviceType: (chunk[9] as string | null) ?? null,
+                os: (chunk[10] as string | null) ?? null,
+                browser: (chunk[11] as string | null) ?? null,
+                urlPath: (chunk[12] as string | null) ?? null,
+                referrer: (chunk[13] as string | null) ?? null,
+                lang: (chunk[14] as string | null) ?? null,
               });
               return [];
             }
@@ -73,16 +98,19 @@ export class FakeDb implements Db {
                   batchId: String(chunk[0]),
                   appId: String(chunk[1]),
                   env: String(chunk[2]),
-                  recordType: String(chunk[3]),
-                  event: (chunk[4] as string | null) ?? null,
-                  userId: (chunk[5] as string | null) ?? null,
-                  sessionId: String(chunk[6]),
-                  orderId: (chunk[7] as string | null) ?? null,
-                  walletType: (chunk[8] as string | null) ?? null,
-                  failReason: (chunk[9] as string | null) ?? null,
-                  properties: (chunk[10] as string | null) ?? null,
-                  occurredAt: chunk[11] as Date,
-                  receivedAt: chunk[12] as Date,
+                  country: (chunk[3] as string | null) ?? null,
+                  deviceType: (chunk[4] as string | null) ?? null,
+                  urlPath: (chunk[5] as string | null) ?? null,
+                  recordType: String(chunk[6]),
+                  event: (chunk[7] as string | null) ?? null,
+                  userId: (chunk[8] as string | null) ?? null,
+                  sessionId: String(chunk[9]),
+                  orderId: (chunk[10] as string | null) ?? null,
+                  walletType: (chunk[11] as string | null) ?? null,
+                  failReason: (chunk[12] as string | null) ?? null,
+                  properties: (chunk[13] as string | null) ?? null,
+                  occurredAt: chunk[14] as Date,
+                  receivedAt: chunk[15] as Date,
                 });
               }
               return [];

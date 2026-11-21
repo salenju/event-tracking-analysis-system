@@ -1,7 +1,7 @@
 import type { DbConnection, DbPool } from '../lib/db.js';
 import type { EventRow } from '../modules/ingest/normalizer.js';
 
-const INSERT_COLUMNS = 13;
+const INSERT_COLUMNS = 16;
 
 /** 单条 multi-row INSERT，避免逐行往返；由调用方保证在事务内执行 */
 export async function bulkInsertEvents(connection: DbConnection, rows: EventRow[]): Promise<void> {
@@ -13,6 +13,9 @@ export async function bulkInsertEvents(connection: DbConnection, rows: EventRow[
       row.batchId,
       row.appId,
       row.env,
+      row.country,
+      row.deviceType,
+      row.urlPath,
       row.recordType,
       row.event,
       row.userId,
@@ -27,8 +30,8 @@ export async function bulkInsertEvents(connection: DbConnection, rows: EventRow[
   }
   await connection.query(
     `INSERT INTO events
-       (batch_id, app_id, env, record_type, \`event\`, user_id, session_id,
-        order_id, wallet_type, fail_reason, properties, occurred_at, received_at)
+       (batch_id, app_id, env, country, device_type, url_path, record_type, \`event\`,
+        user_id, session_id, order_id, wallet_type, fail_reason, properties, occurred_at, received_at)
      VALUES ${placeholders}`,
     params,
   );

@@ -53,7 +53,10 @@ function makePayload(overrides: Record<string, unknown> = {}): string {
   });
 }
 
-function signedRequest(body: string, options: { appId?: string; secret?: string; sentAt?: number } = {}) {
+function signedRequest(
+  body: string,
+  options: { appId?: string; secret?: string; sentAt?: number; headers?: Record<string, string> } = {},
+) {
   const appId = options.appId ?? APP_ID;
   const sentAt = options.sentAt ?? Date.now();
   return {
@@ -65,6 +68,7 @@ function signedRequest(body: string, options: { appId?: string; secret?: string;
       'x-track-app-id': appId,
       'x-track-sent-at': String(sentAt),
       'x-track-sign': signPayload(appId, sentAt, body, options.secret ?? SECRET),
+      ...(options.headers ?? {}),
     },
   };
 }
@@ -93,6 +97,55 @@ describe('POST /api/track', () => {
     expect(db.events.map((row) => row.recordType).sort()).toEqual(['event', 'performance']);
     expect(db.events[0]?.walletType).toBe('metamask');
     expect(db.events[0]?.orderId).toBe('o_1');
+  });
+
+  it('落库批次级上下文：UA / 国家 / 地区 / IP / 页面路径', async () => {
+    const ua =
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+    const body = makePayload({
+      context: {
+        url: 'https://shop.example.com/pay/1001?token=secret-token',
+        referrer: 'https://shop.example.com/order/1',
+        language: 'zh-CN',
+        userAgent: ua,
+      },
+    });
+
+    const response = await app.inject(
+      signedRequest(body, {
+        headers: {
+          'x-client-geo-country': 'sg',
+          'x-client-geo-region': 'Singapore',
+          'x-real-ip': '203.0.113.9',
+        },
+      }),
+    );
+
+    expect(response.statusCode).toBe(200);
+    const batch = db.batches[0];
+    expect(batch.country).toBe('SG');
+    expect(batch.region).toBe('Singapore');
+    expect(batch.ip).toBe('203.0.113.9');
+    expect(batch.deviceType).toBe('mobile');
+    expect(batch.os).toBe('iOS');
+    expect(batch.lang).toBe('zh-CN');
+    // query 必须被剥离，避免 token 落库
+    expect(batch.urlPath).toBe('/pay/1001');
+
+    expect(db.events[0]?.country).toBe('SG');
+    expect(db.events[0]?.deviceType).toBe('mobile');
+    expect(db.events[0]?.urlPath).toBe('/pay/1001');
+  });
+
+  it('UA 从 context 缺失时回退到请求头', async () => {
+    const body = makePayload({ context: { url: 'https://shop.example.com/pay/1' } });
+    await app.inject(
+      signedRequest(body, {
+        headers: { 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36' },
+      }),
+    );
+    expect(db.batches[0]?.deviceType).toBe('desktop');
+    expect(db.batches[0]?.browser).toBe('Chrome');
   });
 
   it('重复批次返回 200 且不重复入库', async () => {

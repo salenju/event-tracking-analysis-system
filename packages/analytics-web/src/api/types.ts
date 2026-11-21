@@ -30,6 +30,8 @@ export interface FunnelResult {
   from: string;
   to: string;
   walletType: string | null;
+  country: string | null;
+  deviceType: string | null;
   totalSessions: number;
   steps: FunnelStep[];
 }
@@ -89,6 +91,72 @@ export interface FilterQuery {
   appId: string;
   env: string;
   walletType: string;
+  /** ISO 3166-1 alpha-2，空表示不筛选 */
+  country: string;
+  /** desktop / mobile / tablet，空表示不筛选 */
+  deviceType: string;
   from: string;
   to: string;
+}
+
+export interface ExperienceMetric {
+  key: string;
+  unit: 'ms' | 'score';
+  samples: number;
+  avg: number | null;
+  p50: number | null;
+  p75: number | null;
+  p95: number | null;
+  max: number | null;
+}
+
+export interface ExperienceGroup {
+  key: string | null;
+  samples: number;
+  avg: number | null;
+  p75: number | null;
+  max: number | null;
+}
+
+export interface PerformanceResult {
+  appId: string;
+  env: string;
+  from: string;
+  to: string;
+  filters: { country: string | null; deviceType: string | null; urlPath: string | null };
+  /** 有 stage=final 记录的会话数 */
+  sessions: number;
+  records: number;
+  metrics: ExperienceMetric[];
+  byPage: ExperienceGroup[];
+  byCountry: ExperienceGroup[];
+  byDevice: ExperienceGroup[];
+}
+
+export interface StayResult {
+  appId: string;
+  env: string;
+  from: string;
+  to: string;
+  filters: { country: string | null; deviceType: string | null; urlPath: string | null };
+  samples: number;
+  avgMs: number | null;
+  p50: number | null;
+  p75: number | null;
+  p95: number | null;
+  maxMs: number | null;
+  byPage: ExperienceGroup[];
+  byTrigger: ExperienceGroup[];
+}
+
+export interface IntegrityResult {
+  appId: string;
+  env: string;
+  from: string;
+  to: string;
+  batches: number;
+  expectedRecords: number;
+  actualRecords: number;
+  missingRecords: number;
+  mismatchBatches: Array<{ batchId: string; expected: number; actual: number }>;
 }
