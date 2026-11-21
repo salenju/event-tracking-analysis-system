@@ -11,9 +11,12 @@
   },
   "scripts": {
     "dev": "npm run dev -w @flyway/track-server",
+    "dev:web": "npm run dev -w @flyway/analytics-web",
     "build": "npm run build -w @flyway/track-server",
+    "build:web": "npm run build -w @flyway/analytics-web",
+    "build:all": "npm run build && npm run build:web",
     "start": "npm run start -w @flyway/track-server",
-    "typecheck": "npm run typecheck -w @flyway/track-server",
+    "typecheck": "npm run typecheck -w @flyway/track-server && npm run typecheck -w @flyway/analytics-web",
     "test": "npm run test -w @flyway/track-server && npm run test:sdk",
     "test:sdk": "npm test -w flyway-track-sdk",
     "sdk:build": "npm run build -w flyway-track-sdk",

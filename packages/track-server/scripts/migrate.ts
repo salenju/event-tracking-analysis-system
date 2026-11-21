@@ -1,3 +1,5 @@
+// 迁移脚本独立运行，不经过 src/config，需要自己加载 .env
+import 'dotenv/config';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import mysql from 'mysql2/promise';
