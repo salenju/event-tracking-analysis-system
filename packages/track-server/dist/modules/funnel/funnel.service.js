@@ -21,6 +21,8 @@ export async function computeFunnel(pool, funnel, config, params) {
         windowMinutes: funnel.windowMinutes,
         maxExecutionMs: config.db.queryTimeoutMs,
         ...(params.walletType ? { walletType: params.walletType } : {}),
+        ...(params.country ? { country: params.country } : {}),
+        ...(params.deviceType ? { deviceType: params.deviceType } : {}),
     };
     const { sql, params: sqlParams } = buildFunnelSql(query);
     const rows = await pool.query(sql, sqlParams);
@@ -48,6 +50,8 @@ export async function computeFunnel(pool, funnel, config, params) {
         from: params.from.toISOString(),
         to: params.to.toISOString(),
         walletType: params.walletType ?? null,
+        country: params.country ?? null,
+        deviceType: params.deviceType ?? null,
         totalSessions,
         steps,
     };
@@ -69,6 +73,8 @@ export async function listDropOffSessions(pool, funnel, config, params) {
         stepIndex: params.stepIndex,
         limit: params.limit + 1,
         ...(params.walletType ? { walletType: params.walletType } : {}),
+        ...(params.country ? { country: params.country } : {}),
+        ...(params.deviceType ? { deviceType: params.deviceType } : {}),
     };
     const { sql, params: sqlParams } = buildDropOffSessionsSql(query);
     const rows = await pool.query(sql, sqlParams);

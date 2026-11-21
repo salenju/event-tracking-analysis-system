@@ -1,4 +1,5 @@
 import { RejectBatchError } from '../../domain/errors.js';
+import { resolveClient } from '../../lib/geo.js';
 import { authenticate } from './auth.js';
 import { ingestBatch } from './ingest.service.js';
 import { logRejected } from './rejected.logger.js';
@@ -25,7 +26,7 @@ export function registerIngestRoutes(app, deps) {
         if (!rawBody) {
             return reply.code(200).send({ ok: true, accepted: 0, rejected: 0, reason: 'empty_body' });
         }
-        const auth = authenticate(deps.config, headers, rawBody, (request.query ?? {}));
+        const auth = await authenticate(deps.config, (appId) => deps.registry.resolveSecret(appId), headers, rawBody, (request.query ?? {}));
         if (!auth.ok) {
             logRejected(request.log, {
                 appId: headerAppId(headers),
@@ -43,8 +44,15 @@ export function registerIngestRoutes(app, deps) {
                 .header('retry-after', String(appLimit.retryAfterSeconds))
                 .send({ ok: false, error: 'rate_limited' });
         }
+        // IP 与国家由网关写进请求头，服务端只做归一化，不做 GeoIP 反查
+        const client = resolveClient(headers, ip, {
+            ipHeaders: deps.config.clientIpHeaders,
+            countryHeaders: deps.config.geoCountryHeaders,
+            regionHeaders: deps.config.geoRegionHeaders,
+        });
+        const userAgentHeader = typeof headers['user-agent'] === 'string' ? headers['user-agent'] : null;
         try {
-            const result = await ingestBatch({ config: deps.config, db: deps.db }, { rawBody, appId: auth.appId });
+            const result = await ingestBatch({ config: deps.config, db: deps.db, logger: request.log }, { rawBody, appId: auth.appId, client, userAgentHeader });
             if (result.status === 'duplicate') {
                 return reply.code(200).send({
                     ok: true,

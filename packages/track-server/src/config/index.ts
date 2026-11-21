@@ -44,6 +44,23 @@ const envSchema = z.object({
   DEFAULT_TIMEZONE_OFFSET: z.string().regex(tzOffset, 'must look like +08:00').default('+08:00'),
   FUNNELS_PATH: z.string().optional(),
 
+  // 看板登录：飞书开放平台「网页应用」的凭证
+  FEISHU_APP_ID: z.string().default(''),
+  FEISHU_APP_SECRET: z.string().default(''),
+  FEISHU_REDIRECT_URI: z.string().default(''),
+  FEISHU_API_BASE: z.string().default('https://open.feishu.cn'),
+  FEISHU_AUTH_BASE: z.string().default('https://passport.feishu.cn'),
+  /** 登录成功后跳回的前端地址 */
+  WEB_ORIGIN: z.string().default('http://localhost:5174'),
+  /** 会话有效期（小时） */
+  SESSION_TTL_HOURS: z.coerce.number().int().positive().max(24 * 30).default(168),
+  /** 视为管理员的飞书 open_id，逗号分隔；库里没有任何管理员时，第一个登录用户自动成为管理员 */
+  ADMIN_BOOTSTRAP_OPEN_IDS: z.string().default(''),
+  /** 查询接口是否要求登录；未显式配置时：生产开启、其他环境关闭 */
+  AUTH_REQUIRED: z.enum(['true', 'false', '1', '0']).optional(),
+  /** 本地调试登录（不经过飞书），未显式配置时：非生产开启；生产环境始终忽略 */
+  DEV_LOGIN_ENABLED: z.enum(['true', 'false', '1', '0']).optional(),
+
   // 客户端 IP 与地理信息由网关透传，服务端不再自己做 GeoIP 反查。
   // 按顺序取第一个命中的请求头，逗号分隔。
   CLIENT_IP_HEADERS: z
@@ -93,12 +110,38 @@ export interface AppConfig {
   clientIpHeaders: string[];
   geoCountryHeaders: string[];
   geoRegionHeaders: string[];
+  /** 查询接口是否要求登录 */
+  authRequired: boolean;
+  /** 本地调试登录是否可用（生产环境恒为 false） */
+  devLoginEnabled: boolean;
+  sessionTtlHours: number;
+  /** 登录成功后跳回的前端地址 */
+  webOrigin: string;
+  /** 飞书网页应用登录配置 */
+  feishu: {
+    appId: string;
+    appSecret: string;
+    redirectUri: string;
+    apiBase: string;
+    authBase: string;
+    /** 未配置 appId/secret 时登录不可用 */
+    enabled: boolean;
+  };
+  /** 直接授予管理员权限的飞书 open_id */
+  bootstrapAdminOpenIds: string[];
 }
 
 function splitList(raw: string): string[] {
   return raw
     .split(',')
     .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function splitRawList(raw: string): string[] {
+  return raw
+    .split(',')
+    .map((item) => item.trim())
     .filter(Boolean);
 }
 
@@ -124,10 +167,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   const data = parsed.data;
   const appSecrets = parseSecrets(data.APP_SECRETS);
-  if (Object.keys(appSecrets).length === 0 && data.START_MODE !== 'api') {
-    // 没有配置任何 app 时，所有上报都会被拒绝，属于必然的部署错误，直接失败更安全
-    throw new Error('APP_SECRETS is empty: at least one appId must be configured');
+  if (Object.keys(appSecrets).length === 0 && data.START_MODE === 'ingest') {
+    // 纯上报模式没有管理后台，应用只能来自环境变量，空配置必然是部署错误
+    throw new Error('APP_SECRETS is empty: ingest-only mode requires at least one appId');
   }
+
+  const readBool = (raw: 'true' | 'false' | '1' | '0' | undefined, fallback: boolean): boolean => {
+    if (raw === undefined) return fallback;
+    return raw === 'true' || raw === '1';
+  };
+  const isProduction = data.NODE_ENV === 'production';
+  const webOrigin = data.WEB_ORIGIN.replace(/\/+$/, '');
+  const feishuEnabled = Boolean(data.FEISHU_APP_ID && data.FEISHU_APP_SECRET);
 
   const cfg: AppConfig = {
     nodeEnv: data.NODE_ENV,
@@ -161,6 +212,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     clientIpHeaders: splitList(data.CLIENT_IP_HEADERS),
     geoCountryHeaders: splitList(data.GEO_COUNTRY_HEADERS),
     geoRegionHeaders: splitList(data.GEO_REGION_HEADERS),
+    // 生产必须登录，其他环境默认放开，避免本地起服务还要配飞书应用
+    authRequired: readBool(data.AUTH_REQUIRED, isProduction),
+    devLoginEnabled: !isProduction && readBool(data.DEV_LOGIN_ENABLED, true),
+    sessionTtlHours: data.SESSION_TTL_HOURS,
+    webOrigin,
+    feishu: {
+      appId: data.FEISHU_APP_ID,
+      appSecret: data.FEISHU_APP_SECRET,
+      // 默认走 /api/auth/feishu/callback；dev 由 vite 代理到后端，生产请配成后端域名
+      redirectUri: data.FEISHU_REDIRECT_URI || `${webOrigin}/api/auth/feishu/callback`,
+      apiBase: data.FEISHU_API_BASE.replace(/\/+$/, ''),
+      authBase: data.FEISHU_AUTH_BASE.replace(/\/+$/, ''),
+      enabled: feishuEnabled,
+    },
+    bootstrapAdminOpenIds: splitRawList(data.ADMIN_BOOTSTRAP_OPEN_IDS),
   };
   if (data.FUNNELS_PATH) cfg.funnelsPath = data.FUNNELS_PATH;
   return cfg;

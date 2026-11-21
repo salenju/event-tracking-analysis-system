@@ -4,6 +4,7 @@ import { RejectBatchError } from '../../domain/errors.js';
 import type { Db } from '../../lib/db.js';
 import type { FixedWindowLimiter } from '../../lib/rate-limiter.js';
 import { resolveClient } from '../../lib/geo.js';
+import type { AppRegistry } from '../../lib/app-secret.js';
 import { authenticate } from './auth.js';
 import { ingestBatch } from './ingest.service.js';
 import { logRejected } from './rejected.logger.js';
@@ -13,6 +14,8 @@ export interface IngestRouteDeps {
   db: Db;
   limiterIp: FixedWindowLimiter;
   limiterApp: FixedWindowLimiter;
+  /** appId → secret，管理后台创建的应用优先 */
+  registry: AppRegistry;
 }
 
 function headerAppId(headers: Record<string, unknown>): string | undefined {
@@ -40,7 +43,13 @@ export function registerIngestRoutes(app: FastifyInstance, deps: IngestRouteDeps
       return reply.code(200).send({ ok: true, accepted: 0, rejected: 0, reason: 'empty_body' });
     }
 
-    const auth = authenticate(deps.config, headers, rawBody, (request.query ?? {}) as Record<string, unknown>);
+    const auth = await authenticate(
+      deps.config,
+      (appId) => deps.registry.resolveSecret(appId),
+      headers,
+      rawBody,
+      (request.query ?? {}) as Record<string, unknown>,
+    );
     if (!auth.ok) {
       logRejected(request.log, {
         appId: headerAppId(headers),

@@ -198,6 +198,49 @@ function buildIntegrity(now = Date.now()) {
   };
 }
 
+const MOCK_USER = {
+  id: 1,
+  name: '本地调试账号',
+  avatarUrl: null,
+  email: 'dev@example.com',
+  role: 'admin',
+  status: 'active',
+  source: 'local',
+  localUsername: 'admin',
+  openId: null,
+  createdAt: new Date(Date.now() - 7 * 86400_000).toISOString(),
+  lastLoginAt: new Date().toISOString(),
+};
+
+const MOCK_APPS = [
+  {
+    appId: 'fylinking-storefront',
+    name: 'Fylinking 买家端',
+    env: 'prod',
+    status: 'active',
+    remark: '来自环境变量 APP_SECRETS，只读',
+    source: 'env',
+    secretMask: '****',
+    createdBy: 'env',
+    createdAt: new Date(0).toISOString(),
+    updatedAt: new Date(0).toISOString(),
+  },
+  {
+    appId: 'storefront-1a2b3c4d',
+    name: 'Storefront 预发',
+    env: 'test',
+    status: 'active',
+    remark: 'mock 数据',
+    source: 'db',
+    secretMask: '3f1a****************b9c2',
+    createdBy: 'ou_mock_admin',
+    createdAt: new Date(Date.now() - 3 * 86400_000).toISOString(),
+    updatedAt: new Date(Date.now() - 86400_000).toISOString(),
+  },
+];
+
+const SIGNING = { signRequired: true, signWindowSeconds: 300, trackPath: '/api/track', env: 'prod' };
+
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? '/', `http://127.0.0.1:${PORT}`);
   const path = url.pathname;
@@ -206,7 +249,7 @@ const server = createServer((request, response) => {
     response.writeHead(204, {
       'access-control-allow-origin': '*',
       'access-control-allow-headers': '*',
-      'access-control-allow-methods': 'GET,POST,OPTIONS',
+      'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
     });
     response.end();
     return;
@@ -224,6 +267,73 @@ const server = createServer((request, response) => {
   if (path === '/api/experience/performance') return json(response, 200, buildPerformance());
   if (path === '/api/experience/stay') return json(response, 200, buildStay());
   if (path === '/api/meta/integrity') return json(response, 200, buildIntegrity());
+
+  // 登录相关：mock 下不校验 token，固定返回管理员身份
+  if (path === '/api/auth/config') {
+    return json(response, 200, { ok: true, feishuEnabled: false, devLoginEnabled: true, authRequired: false });
+  }
+  if (path === '/api/auth/me') return json(response, 200, { ok: true, user: MOCK_USER, authRequired: false });
+  if (path === '/api/auth/logout') return json(response, 200, { ok: true });
+  if (path === '/api/auth/dev-login') {
+    return json(response, 200, { ok: true, token: 'mock-token', user: MOCK_USER });
+  }
+  if (path === '/api/auth/feishu/login-url') {
+    return json(response, 200, {
+      ok: false,
+      error: 'feishu_disabled',
+      message: 'mock 环境未配置飞书登录，请使用本地调试登录',
+    });
+  }
+
+  // 管理后台
+  if (path === '/api/admin/apps' && request.method === 'GET') {
+    return json(response, 200, { ok: true, apps: MOCK_APPS, signing: SIGNING });
+  }
+  if (path === '/api/admin/apps' && request.method === 'POST') {
+    const app = {
+      ...MOCK_APPS[1],
+      appId: `mock-app-${Math.random().toString(16).slice(2, 10)}`,
+      name: `新建应用 ${MOCK_APPS.length + 1}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    MOCK_APPS.push(app);
+    return json(response, 200, { ok: true, app, secret: 'mock-secret-0123456789abcdef0123456789' });
+  }
+  if (/^\/api\/admin\/apps\/[^/]+\/rotate$/.test(path)) {
+    return json(response, 200, {
+      ok: true,
+      app: MOCK_APPS[1],
+      secret: `mock-rotated-${Math.random().toString(16).slice(2, 10)}`,
+    });
+  }
+  if (/^\/api\/admin\/apps\/[^/]+$/.test(path) && request.method === 'PATCH') {
+    return json(response, 200, { ok: true, app: MOCK_APPS[1] });
+  }
+  if (/^\/api\/admin\/apps\/[^/]+$/.test(path) && request.method === 'DELETE') {
+    return json(response, 200, { ok: true });
+  }
+  if (path === '/api/admin/users') {
+    return json(response, 200, {
+      ok: true,
+      users: [
+        MOCK_USER,
+        {
+          ...MOCK_USER,
+          id: 2,
+          name: '只读成员',
+          email: 'viewer@example.com',
+          role: 'viewer',
+          source: 'feishu',
+          localUsername: null,
+          openId: 'ou_mock_viewer',
+        },
+      ],
+    });
+  }
+  if (/^\/api\/admin\/users\/\d+$/.test(path) && request.method === 'PATCH') {
+    return json(response, 200, { ok: true, user: MOCK_USER });
+  }
 
   return json(response, 404, { ok: false, error: 'not_found', path });
 });

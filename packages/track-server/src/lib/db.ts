@@ -14,6 +14,8 @@ export interface DbConnection {
 
 export interface DbPool {
   query<T = unknown>(sql: string, params?: readonly unknown[]): Promise<T[]>;
+  /** 执行写语句并返回影响行数（query() 会把 OkPacket 吞成 []，无法判断是否命中） */
+  affected(sql: string, params?: readonly unknown[]): Promise<number>;
   getConnection(): Promise<DbConnection>;
   close(): Promise<void>;
 }
@@ -46,6 +48,10 @@ function wrapPool(pool: mysql.Pool): DbPool {
     async query<T = unknown>(sql: string, params: readonly unknown[] = []): Promise<T[]> {
       const [rows] = await pool.query(sql, params as unknown[]);
       return toRows(rows) as T[];
+    },
+    async affected(sql: string, params: readonly unknown[] = []): Promise<number> {
+      const [result] = await pool.query(sql, params as unknown[]);
+      return Number((result as { affectedRows?: number } | null)?.affectedRows ?? 0);
     },
     async getConnection(): Promise<DbConnection> {
       const connection = await pool.getConnection();

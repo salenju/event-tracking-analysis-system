@@ -5,8 +5,26 @@ import { isDuplicateKeyError } from '../domain/errors.js';
  */
 export async function insertBatchIfAbsent(connection, row) {
     try {
-        await connection.query(`INSERT INTO event_batches (batch_id, app_id, env, record_count, received_at)
-       VALUES (?, ?, ?, ?, ?)`, [row.batchId, row.appId, row.env, row.recordCount, row.receivedAt]);
+        await connection.query(`INSERT INTO event_batches
+         (batch_id, app_id, env, record_count, received_at,
+          ip, country, region, ua, device_type, os, browser, url_path, referrer, lang)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+            row.batchId,
+            row.appId,
+            row.env,
+            row.recordCount,
+            row.receivedAt,
+            row.ip ?? null,
+            row.country ?? null,
+            row.region ?? null,
+            row.ua ?? null,
+            row.deviceType ?? null,
+            row.os ?? null,
+            row.browser ?? null,
+            row.urlPath ?? null,
+            row.referrer ?? null,
+            row.lang ?? null,
+        ]);
         return true;
     }
     catch (error) {

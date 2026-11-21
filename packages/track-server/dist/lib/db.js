@@ -20,6 +20,10 @@ function wrapPool(pool) {
             const [rows] = await pool.query(sql, params);
             return toRows(rows);
         },
+        async affected(sql, params = []) {
+            const [result] = await pool.query(sql, params);
+            return Number(result?.affectedRows ?? 0);
+        },
         async getConnection() {
             const connection = await pool.getConnection();
             return wrap(connection);

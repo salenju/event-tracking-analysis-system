@@ -34,6 +34,32 @@ export function readInt(source, key, options) {
     }
     return value;
 }
+/**
+ * 读取 JSON 请求体。
+ * 注意 registerRawBody 把所有 content-type 都按字符串接收（为了埋点接口拿到原始 body），
+ * 所以管理接口的 application/json 也会是字符串，必须在这里统一 parse。
+ */
+export function readJsonBody(body) {
+    if (body && typeof body === 'object')
+        return body;
+    if (typeof body === 'string') {
+        const text = body.trim();
+        if (!text)
+            return {};
+        let parsed;
+        try {
+            parsed = JSON.parse(text);
+        }
+        catch {
+            throw new BadRequestError('request body must be valid JSON');
+        }
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            return parsed;
+        }
+        throw new BadRequestError('request body must be a JSON object');
+    }
+    return {};
+}
 export function readStringList(source, key) {
     const raw = source[key];
     if (raw === undefined)

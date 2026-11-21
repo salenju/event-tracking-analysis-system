@@ -1,4 +1,4 @@
-import { BadRequestError } from '../domain/errors.js';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError, UnauthorizedError, UpstreamError, } from '../domain/errors.js';
 export function isTrackPath(url) {
     return url.startsWith('/api/track');
 }
@@ -25,6 +25,22 @@ export function registerErrorHandler(app) {
         }
         if (error instanceof BadRequestError) {
             return reply.code(400).send({ ok: false, error: 'bad_request', message: error.message });
+        }
+        if (error instanceof UnauthorizedError) {
+            return reply.code(401).send({ ok: false, error: error.code, message: error.message });
+        }
+        if (error instanceof ForbiddenError) {
+            return reply.code(403).send({ ok: false, error: 'forbidden', message: error.message });
+        }
+        if (error instanceof NotFoundError) {
+            return reply.code(404).send({ ok: false, error: 'not_found', message: error.message });
+        }
+        if (error instanceof ConflictError) {
+            return reply.code(409).send({ ok: false, error: 'conflict', message: error.message });
+        }
+        if (error instanceof UpstreamError) {
+            request.log.warn({ err: error }, 'upstream failed');
+            return reply.code(502).send({ ok: false, error: 'upstream_error', message: error.message });
         }
         if (error.statusCode && error.statusCode < 500) {
             return reply.code(error.statusCode).send({ ok: false, error: error.code ?? 'client_error', message: error.message });

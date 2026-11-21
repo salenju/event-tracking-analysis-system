@@ -9,6 +9,9 @@ export const HEADERS = {
 
 export type AuthOutcome = { ok: true; appId: string } | { ok: false; reason: string; detail?: string };
 
+/** appId → secret；未知或已停用时返回 undefined */
+export type SecretResolver = (appId: string) => Promise<string | undefined>;
+
 function readHeader(headers: Record<string, unknown>, name: string): string | undefined {
   const value = headers[name];
   if (typeof value === 'string' && value) return value;
@@ -24,7 +27,7 @@ function readQuery(query: Record<string, unknown>, name: string): string | undef
 
 /**
  * 验签流程：
- * 1. appId 必须在白名单（APP_SECRETS 的 key）
+ * 1. appId 能查到密钥（管理后台创建的应用优先，其次环境变量 APP_SECRETS；停用视为不存在）
  * 2. sentAt 在 ±window 内，防重放
  * 3. HMAC(appId.sentAt.rawBody) 与签名一致
  *
@@ -32,18 +35,19 @@ function readQuery(query: Record<string, unknown>, name: string): string | undef
  * 因此降级到 query（?appId=&sentAt=&sign=）。
  * SIGN_REQUIRED=false 时只做白名单，用于本地联调。
  */
-export function authenticate(
+export async function authenticate(
   config: AppConfig,
+  resolveSecret: SecretResolver,
   headers: Record<string, unknown>,
   rawBody: string,
   query: Record<string, unknown> = {},
   now = Date.now(),
-): AuthOutcome {
+): Promise<AuthOutcome> {
   const appId = readHeader(headers, HEADERS.appId) ?? readQuery(query, 'appId');
   if (!appId) {
     return { ok: false, reason: 'missing_app_id' };
   }
-  const secret = config.appSecrets[appId];
+  const secret = await resolveSecret(appId);
   if (!secret) {
     return { ok: false, reason: 'unknown_app_id', detail: appId };
   }

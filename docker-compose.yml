@@ -30,11 +30,21 @@ services:
       DB_USER: root
       DB_PASSWORD: root
       DB_NAME: event_tracking
+      # 存量应用的静态密钥；新建应用请用管理后台（写 analytics_apps 表），不再改这里
       APP_SECRETS: '{"fylinking-storefront":"local-dev-secret"}'
       SIGN_REQUIRED: 'false'
       CORS_ORIGINS: '*'
       TRACK_ENV: prod
       LOG_LEVEL: info
+      # 看板登录：飞书开放平台「网页应用」凭证
+      FEISHU_APP_ID: ''
+      FEISHU_APP_SECRET: ''
+      FEISHU_REDIRECT_URI: 'http://localhost:5174/api/auth/feishu/callback'
+      WEB_ORIGIN: 'http://localhost:5174'
+      SESSION_TTL_HOURS: '168'
+      # 本 compose 用于本地联调，先关掉鉴权；生产环境请填好上面的飞书凭证后改成 true
+      AUTH_REQUIRED: 'false'
+      DEV_LOGIN_ENABLED: 'true'
     ports:
       - '8080:8080'
     depends_on:

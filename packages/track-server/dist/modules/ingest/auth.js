@@ -20,7 +20,7 @@ function readQuery(query, name) {
 }
 /**
  * 验签流程：
- * 1. appId 必须在白名单（APP_SECRETS 的 key）
+ * 1. appId 能查到密钥（管理后台创建的应用优先，其次环境变量 APP_SECRETS；停用视为不存在）
  * 2. sentAt 在 ±window 内，防重放
  * 3. HMAC(appId.sentAt.rawBody) 与签名一致
  *
@@ -28,12 +28,12 @@ function readQuery(query, name) {
  * 因此降级到 query（?appId=&sentAt=&sign=）。
  * SIGN_REQUIRED=false 时只做白名单，用于本地联调。
  */
-export function authenticate(config, headers, rawBody, query = {}, now = Date.now()) {
+export async function authenticate(config, resolveSecret, headers, rawBody, query = {}, now = Date.now()) {
     const appId = readHeader(headers, HEADERS.appId) ?? readQuery(query, 'appId');
     if (!appId) {
         return { ok: false, reason: 'missing_app_id' };
     }
-    const secret = config.appSecrets[appId];
+    const secret = await resolveSecret(appId);
     if (!secret) {
         return { ok: false, reason: 'unknown_app_id', detail: appId };
     }

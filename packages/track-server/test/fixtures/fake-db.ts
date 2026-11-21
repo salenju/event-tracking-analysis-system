@@ -59,6 +59,9 @@ export class FakeDb implements Db {
       async query<T = unknown>(): Promise<T[]> {
         return [];
       },
+      async affected(): Promise<number> {
+        return 0;
+      },
       async getConnection(): Promise<DbConnection> {
         const connection: DbConnection = {
           async query<T = unknown>(sql: string, params: readonly unknown[] = []): Promise<T[]> {

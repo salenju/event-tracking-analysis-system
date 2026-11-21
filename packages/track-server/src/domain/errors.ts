@@ -21,6 +21,49 @@ export class BadRequestError extends Error {
   }
 }
 
+/** 未登录或会话过期 → 401，前端据此跳登录页 */
+export class UnauthorizedError extends Error {
+  readonly code: string;
+
+  constructor(message = 'login required', code = 'unauthorized') {
+    super(message);
+    this.name = 'UnauthorizedError';
+    this.code = code;
+  }
+}
+
+/** 已登录但权限不足 → 403 */
+export class ForbiddenError extends Error {
+  constructor(message = 'forbidden') {
+    super(message);
+    this.name = 'ForbiddenError';
+  }
+}
+
+/** 资源不存在 → 404 */
+export class NotFoundError extends Error {
+  constructor(message = 'not found') {
+    super(message);
+    this.name = 'NotFoundError';
+  }
+}
+
+/** 唯一键冲突等 → 409 */
+export class ConflictError extends Error {
+  constructor(message = 'conflict') {
+    super(message);
+    this.name = 'ConflictError';
+  }
+}
+
+/** 依赖的外部服务（飞书开放平台）返回异常 → 502 */
+export class UpstreamError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UpstreamError';
+  }
+}
+
 export function isDuplicateKeyError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const err = error as { code?: string; errno?: number };
